@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # 作用：
-# - 根据 OS/ARCH 选择 tools/subconverter/<platform>/subconverter
-# - 生成稳定入口 tools/subconverter/subconverter（软链优先，失败则复制）
+# - 根据 OS/ARCH 选择 libs/subconverter/<platform>/subconverter
+# - 生成稳定入口 libs/subconverter/subconverter（软链优先，失败则复制）
 # -（可选）以 daemon 模式启动本地 subconverter（HTTP 服务）
 # - 导出统一变量给后续脚本使用：
 #   SUBCONVERTER_BIN / SUBCONVERTER_READY / SUBCONVERTER_URL
@@ -12,12 +12,12 @@ set -euo pipefail
 # - 永不 exit 1（不可用就 Ready=false，主流程继续）
 # - 不阻塞 start.sh（快速启动，不等待健康检查）
 
-Server_Dir="${Server_Dir:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+Server_Dir="${Server_Dir:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 Temp_Dir="${Temp_Dir:-$Server_Dir/temp}"
 
 mkdir -p "$Temp_Dir"
 
-SC_DIR="$Server_Dir/tools/subconverter"
+SC_DIR="$Server_Dir/libs/subconverter"
 SC_LINK="$SC_DIR/subconverter"   # 稳定入口（最终用于启动/调用）
 Subconverter_Bin="$SC_LINK"
 Subconverter_Ready=false
@@ -58,7 +58,7 @@ detect_arch() {
 }
 
 pick_platform_bin() {
-  # 你的仓库结构：tools/subconverter/linux-amd64/subconverter 等
+  # 新的仓库结构：libs/subconverter/linux-amd64/subconverter 等
   local os="$1" arch="$2"
   local p="$SC_DIR/${os}-${arch}/subconverter"
   if [ -f "$p" ]; then
@@ -136,7 +136,7 @@ main() {
     return 0
   fi
 
-  # 2) 生成稳定入口 tools/subconverter/subconverter
+  # 2) 生成稳定入口 libs/subconverter/subconverter
   if ! make_stable_link_or_copy "$platform_bin"; then
     warn "Failed to create stable entry: $SC_LINK"
     Subconverter_Ready=false

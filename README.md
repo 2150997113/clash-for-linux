@@ -55,7 +55,7 @@
 ```
 git clone --branch master --depth 1 https://github.com/wnlen/clash-for-linux.git
 cd clash-for-linux
-sudo bash install.sh
+sudo make install
 ```
 
 安装脚本将自动完成：
@@ -64,7 +64,6 @@ sudo bash install.sh
 - 创建 systemd 服务（默认启用并启动）
 - 检测并规避端口冲突
 - 安装 `clashctl` 到 `/usr/local/bin`
-- 创建低权限运行用户（默认 `clash`）
 
 ### [进阶安装与高级用法](docs/install.md)
 
@@ -85,13 +84,13 @@ sudo bash install.sh
 编辑 `.env` 文件，设置订阅地址：
 
 ```
-sudo bash -c 'echo "CLASH_URL=<订阅地址>" > /opt/clash-for-linux/.env'
+sudo bash -c 'echo "CLASH_URL=<订阅地址>" >> .env'
 ```
 
 配置完成后，**重启服务使配置生效**：
 
 ```
-sudo systemctl restart clash-for-linux.service
+sudo make restart
 ```
 
 说明：
@@ -131,19 +130,19 @@ http://127.0.0.1:9090/ui
 编辑 `.env` 文件，设置公网访问（对外端口不用改，改了机器人也能扫到，密钥设置的长点就行）：
 
 ```
-sudo bash -c 'echo "EXTERNAL_CONTROLLER=0.0.0.0:9090" > /opt/clash-for-linux/.env'
+sudo bash -c 'echo "EXTERNAL_CONTROLLER=0.0.0.0:9090" >> .env'
 ```
 
 配置完成后，**重启服务使配置生效**：
 
 ```
-sudo systemctl restart clash-for-linux.service
+sudo make restart
 ```
 
 密钥留空时：脚本可自动生成随机值
 获取密钥命令：
 ```
-sudo sed -nE 's/^[[:space:]]*secret:[[:space:]]*//p' "/opt/clash-for-linux/conf/config.yaml" | head -n 1
+sudo sed -nE 's/^[[:space:]]*secret:[[:space:]]*//p' "conf/config.yaml" | head -n 1
 ```
 
 
@@ -276,7 +275,7 @@ env | grep -E 'http_proxy|https_proxy'
 ## 🧹 卸载
 
 ```
-sudo bash uninstall.sh
+sudo make uninstall
 ```
 
 ------
@@ -293,9 +292,8 @@ sudo bash uninstall.sh
 
 `subconverter` 用于将订阅内容转换为标准 clash 配置。默认会尝试以下位置：
 
-- `tools/subconverter/subconverter`
-- `tools/subconverter/subconverter-<arch>`
-- `tools/subconverter/bin/subconverter-<arch>`
+- `libs/subconverter/subconverter`
+- `libs/subconverter/<arch>/subconverter` (如 `linux-amd64/subconverter`)
 
 其中 `<arch>` 取值为：
 

@@ -3,7 +3,8 @@ set -euo pipefail
 
 #################### 基本变量 ####################
 
-Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 获取项目根目录（从 scripts/cmd/ 向上两级）
+Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 Service_Name="clash-for-linux"
 
 Service_User="root"
@@ -39,8 +40,8 @@ Type=simple
 WorkingDirectory=$Server_Dir
 
 # 启动 / 停止
-ExecStart=/bin/bash $Server_Dir/start.sh
-ExecStop=/bin/bash $Server_Dir/shutdown.sh
+ExecStart=/bin/bash $Server_Dir/scripts/cmd/start-service.sh
+ExecStop=/bin/bash $Server_Dir/scripts/cmd/shutdown.sh
 
 # 失败策略
 Restart=on-failure
@@ -51,6 +52,7 @@ TimeoutStopSec=30
 # 环境变量
 Environment=SYSTEMD_MODE=true
 Environment=CLASH_ENV_FILE=$Server_Dir/temp/clash-for-linux.sh
+Environment=CLASH_HOME=$Server_Dir
 
 [Install]
 WantedBy=multi-user.target

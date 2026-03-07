@@ -2,9 +2,11 @@
 set -euo pipefail
 
 # =========================
-# 参数（对标 install.sh + install_systemd.sh）
+# 参数（对标 install-service.sh）
 # =========================
-Install_Dir="${CLASH_INSTALL_DIR:-/opt/clash-for-linux}"
+# 获取项目根目录（从 scripts/cmd/ 向上两级）
+Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+Install_Dir="$Server_Dir"
 Service_Name="clash-for-linux"
 Service_User="root"
 Service_Group="root"
@@ -27,7 +29,7 @@ err()   { echo -e "${RED}[ERROR]${NC} $*"; }
 # 前置校验
 # =========================
 if [ "$(id -u)" -ne 0 ]; then
-  err "需要 root 权限执行卸载脚本（请使用 sudo bash uninstall.sh）"
+  err "需要 root 权限执行卸载脚本（请使用 sudo make uninstall）"
   exit 1
 fi
 
@@ -37,9 +39,9 @@ info "Install_Dir=${Install_Dir}"
 # =========================
 # 1) 优雅停止（优先 shutdown.sh，再 systemd）
 # =========================
-if [ -f "${Install_Dir}/shutdown.sh" ]; then
+if [ -f "${Install_Dir}/scripts/cmd/shutdown.sh" ]; then
   info "执行 shutdown.sh（优雅停止）..."
-  bash "${Install_Dir}/shutdown.sh" >/dev/null 2>&1 || true
+  bash "${Install_Dir}/scripts/cmd/shutdown.sh" >/dev/null 2>&1 || true
 fi
 
 if command -v systemctl >/dev/null 2>&1; then
@@ -78,7 +80,7 @@ if pgrep -x clash >/dev/null 2>&1; then
 fi
 
 # =========================
-# 3) 删除 systemd unit（对标 install_systemd.sh）
+# 3) 删除 systemd unit（对标 setup-systemd.sh）
 # =========================
 if [ -f "$Unit_Path" ]; then
   rm -f "$Unit_Path"
@@ -122,13 +124,10 @@ fi
 
 # =========================
 # 5) 删除安装目录
+# 注意：项目所在位置即安装位置，卸载时不删除项目目录
 # =========================
-if [ -d "$Install_Dir" ]; then
-  rm -rf "$Install_Dir"
-  ok "已移除安装目录: ${Install_Dir}"
-else
-  warn "未找到安装目录: ${Install_Dir}"
-fi
+info "项目目录保留: ${Install_Dir}"
+info "如需完全删除，请手动执行: rm -rf ${Install_Dir}"
 
 # =========================
 # 7) 提示：当前终端代理变量需要手动清
@@ -139,4 +138,4 @@ echo "  unset http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY"
 echo "  # 或关闭终端重新打开"
 
 echo
-ok "卸载完成（root-only 模式）✅"
+ok "卸载完成 ✅"

@@ -29,22 +29,22 @@ action() {
 if_success() {
   local ReturnStatus=$3
   if [ $ReturnStatus -eq 0 ]; then
-          action "$1" /bin/true
+          action "$1" /bin::true
   else
-          action "$2" /bin/false
+          action "$2" /bin::false
           exit 1
   fi
 }
 
-# 定义路劲变量
-Server_Dir=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
+# 获取项目根目录（从 scripts/cmd/ 向上两级）
+Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 Conf_Dir="$Server_Dir/conf"
 Log_Dir="$Server_Dir/logs"
 Temp_Dir="$Server_Dir/temp"
 PID_FILE="$Temp_Dir/clash.pid"
 
 if [ "$1" = "--update" ]; then
-	bash "$Server_Dir/update.sh" || exit 1
+	bash "$Server_Dir/scripts/cmd/update-subscription.sh" || exit 1
 fi
 
 ## 关闭clash服务
@@ -92,38 +92,19 @@ if_success $Text1 $Text2 $ReturnStatus
 sleep 3
 
 ## 获取CPU架构
-if /bin/arch &>/dev/null; then
-	CpuArch=`/bin/arch`
-elif /usr/bin/arch &>/dev/null; then
-	CpuArch=`/usr/bin/arch`
-elif /bin/uname -m &>/dev/null; then
-	CpuArch=`/bin/uname -m`
-else
-	echo -e "\033[31m\n[ERROR] Failed to obtain CPU architecture！\033[0m"
-	exit 1
-fi
+# shellcheck disable=SC1090
+source "$Server_Dir/scripts/lib/get_cpu_arch.sh"
 
 ## 重启启动clash服务
 Text5="服务启动成功！"
 Text6="服务启动失败！"
-if [[ $CpuArch =~ "x86_64" ]]; then
-	nohup $Server_Dir/bin/clash-linux-amd64 -d $Conf_Dir &> $Log_Dir/clash.log &
-	PID=$!
-	ReturnStatus=$?
-	if [ $ReturnStatus -eq 0 ]; then
-		echo "$PID" > "$PID_FILE"
-	fi
-	if_success $Text5 $Text6 $ReturnStatus
-elif [[ $CpuArch =~ "aarch64" ||  $CpuArch =~ "arm64" ]]; then
-	nohup $Server_Dir/bin/clash-linux-arm64 -d $Conf_Dir &> $Log_Dir/clash.log &
-	PID=$!
-	ReturnStatus=$?
-	if [ $ReturnStatus -eq 0 ]; then
-		echo "$PID" > "$PID_FILE"
-	fi
-	if_success $Text5 $Text6 $ReturnStatus
-elif [[ $CpuArch =~ "armv7" ]]; then
-	nohup $Server_Dir/bin/clash-linux-armv7 -d $Conf_Dir &> $Log_Dir/clash.log &
+# shellcheck disable=SC1090
+source "$Server_Dir/scripts/lib/resolve_clash.sh"
+Clash_Bin="$(resolve_clash_bin "$Server_Dir" "$CpuArch")"
+ReturnStatus=$?
+
+if [ $ReturnStatus -eq 0 ]; then
+	nohup "$Clash_Bin" -d "$Conf_Dir" &> "$Log_Dir/clash.log" &
 	PID=$!
 	ReturnStatus=$?
 	if [ $ReturnStatus -eq 0 ]; then
@@ -131,6 +112,5 @@ elif [[ $CpuArch =~ "armv7" ]]; then
 	fi
 	if_success $Text5 $Text6 $ReturnStatus
 else
-	echo -e "\033[31m\n[ERROR] Unsupported CPU Architecture！\033[0m"
-	exit 1
+	if_success $Text5 $Text6 $ReturnStatus
 fi

@@ -4,8 +4,10 @@ set -euo pipefail
 # =========================
 # 基础参数
 # =========================
-Server_Dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-Install_Dir="${CLASH_INSTALL_DIR:-/opt/clash-for-linux}"
+# 获取项目根目录（从 scripts/cmd/ 向上两级）
+Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# 项目所在位置即安装位置（不再拷贝到 /opt）
+Install_Dir="$Server_Dir"
 Service_Name="clash-for-linux"
 Service_User="root"
 Service_Group="root"
@@ -93,7 +95,7 @@ section() {
 # 前置校验
 # =========================
 if [ "$(id -u)" -ne 0 ]; then
-  err "需要 root 权限执行安装脚本（请使用 sudo bash install.sh）"
+  err "需要 root 权限执行安装脚本（请使用 sudo make install）"
   exit 1
 fi
 
@@ -103,22 +105,13 @@ if [ ! -f "${Server_Dir}/.env" ]; then
 fi
 
 # =========================
-# 同步到安装目录（保持你原逻辑）
+# 设置权限
 # =========================
-mkdir -p "$Install_Dir"
-if [ "$Server_Dir" != "$Install_Dir" ]; then
-  info "同步项目文件到安装目录：${Install_Dir}"
-  if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete --exclude '.git' "$Server_Dir/" "$Install_Dir/"
-  else
-    cp -a "$Server_Dir/." "$Install_Dir/"
-  fi
-fi
-
-chmod +x "$Install_Dir"/*.sh 2>/dev/null || true
-chmod +x "$Install_Dir"/scripts/* 2>/dev/null || true
-chmod +x "$Install_Dir"/bin/* 2>/dev/null || true
-chmod +x "$Install_Dir"/clashctl 2>/dev/null || true
+chmod +x "$Install_Dir/scripts/cmd/"*.sh 2>/dev/null || true
+chmod +x "$Install_Dir/scripts/lib/"*.sh 2>/dev/null || true
+chmod +x "$Install_Dir/libs/clash/"* 2>/dev/null || true
+chmod +x "$Install_Dir/libs/subconverter/"*/subconverter 2>/dev/null || true
+chmod +x "$Install_Dir/clashctl" 2>/dev/null || true
 
 # =========================
 # 加载环境与依赖脚本
@@ -126,11 +119,11 @@ chmod +x "$Install_Dir"/clashctl 2>/dev/null || true
 # shellcheck disable=SC1090
 source "$Install_Dir/.env"
 # shellcheck disable=SC1090
-source "$Install_Dir/scripts/get_cpu_arch.sh"
+source "$Install_Dir/scripts/lib/get_cpu_arch.sh"
 # shellcheck disable=SC1090
-source "$Install_Dir/scripts/resolve_clash.sh"
+source "$Install_Dir/scripts/lib/resolve_clash.sh"
 # shellcheck disable=SC1090
-source "$Install_Dir/scripts/port_utils.sh"
+source "$Install_Dir/scripts/lib/port_utils.sh"
 
 if [[ -z "${CpuArch:-}" ]]; then
   err "无法识别 CPU 架构"
@@ -279,7 +272,7 @@ wait_secret_ready() {
 }
 
 # 计算字符串可视宽度：中文大概率按 2 宽处理（简单够用版）
-# 注：终端宽度/字体不统一时，中文宽度估算永远只能“近似”
+# 注：终端宽度/字体不统一时，中文宽度估算永远只能"近似"
 vis_width() {
   python3 - <<'PY' "$1"
 import sys
@@ -371,7 +364,7 @@ fi
 
 if [ "$Systemd_Usable" = "true" ]; then
   if [ "${CLASH_ENABLE_SERVICE:-true}" = "true" ] || [ "${CLASH_START_SERVICE:-true}" = "true" ]; then
-    CLASH_SERVICE_USER="$Service_User" CLASH_SERVICE_GROUP="$Service_Group" "$Install_Dir/scripts/install_systemd.sh"
+    CLASH_SERVICE_USER="$Service_User" CLASH_SERVICE_GROUP="$Service_Group" "$Install_Dir/scripts/cmd/setup-systemd.sh"
 
     if [ "${CLASH_ENABLE_SERVICE:-true}" = "true" ]; then
       systemctl enable "${Service_Name}.service" >/dev/null 2>&1 || true
@@ -484,8 +477,8 @@ if [ "$Systemd_Usable" = "true" ]; then
 
   log ""
   log "${C_BOLD}常用命令：${C_NC}"
-  log "  $(cmd "sudo systemctl status ${Service_Name}.service")"
-  log "  $(cmd "sudo systemctl restart ${Service_Name}.service")"
+  log "  $(cmd "make status")"
+  log "  $(cmd "sudo make restart")"
 else
   section "服务状态"
   warn "当前环境未启用 systemd（如 Docker 容器），请使用 clashctl 管理进程"
@@ -542,7 +535,7 @@ else
   log ""
   log "配置完成后重启服务："
   if [ "$Systemd_Usable" = "true" ]; then
-    log "  $(cmd "sudo systemctl restart ${Service_Name}.service")"
+    log "  $(cmd "sudo make restart")"
   else
     log "  $(cmd "sudo clashctl restart")"
   fi

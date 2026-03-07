@@ -44,10 +44,10 @@ download_clash_bin() {
 	fi
 
 	download_url="${download_url//\{arch\}/${resolved_arch}}"
-	download_target="${server_dir}/bin/clash-${resolved_arch}"
+	download_target="${server_dir}/libs/clash/clash-${resolved_arch}"
 	archive_file="${server_dir}/temp/clash-${resolved_arch}.download"
 
-	mkdir -p "${server_dir}/bin" "${server_dir}/temp"
+	mkdir -p "${server_dir}/libs/clash" "${server_dir}/temp"
 
 	if command -v curl >/dev/null 2>&1; then
 		curl -L -sS -o "${archive_file}" "${download_url}"
@@ -92,11 +92,11 @@ resolve_clash_bin() {
 
 	resolved_arch=$(resolve_clash_arch "$detected_arch")
 	if [ -n "$resolved_arch" ]; then
-		candidates+=("${server_dir}/bin/clash-${resolved_arch}")
+		candidates+=("${server_dir}/libs/clash/clash-${resolved_arch}")
 	fi
 	candidates+=(
-		"${server_dir}/bin/clash-${detected_arch}"
-		"${server_dir}/bin/clash"
+		"${server_dir}/libs/clash/clash-${detected_arch}"
+		"${server_dir}/libs/clash/clash"
 	)
 
 	for candidate in "${candidates[@]}"; do
@@ -112,7 +112,7 @@ resolve_clash_bin() {
 	fi
 
 	echo -e "\033[31m\n[ERROR] 未找到可用的 Clash 二进制。\033[0m"
-	echo -e "请将对应架构的二进制放入: $server_dir/bin/"
+	echo -e "请将对应架构的二进制放入: $server_dir/libs/clash/"
 	echo -e "可用命名示例: clash-${resolved_arch} 或 clash-${detected_arch}"
 	echo -e "或通过 CLASH_BIN 指定自定义路径。"
 	return 1

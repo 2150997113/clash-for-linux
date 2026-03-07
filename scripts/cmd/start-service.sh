@@ -9,7 +9,7 @@ trap 'rc=$?; echo "[ERR] rc=$rc line=$LINENO cmd=$BASH_COMMAND" >&2' ERR
 # --- DEBUG end ---
 
 ############################################
-# Clash for Linux - start.sh (Full Version)
+# Clash for Linux - start-service.sh (Full Version)
 # - systemd 模式下订阅失败/下载失败：不退出，使用 conf/config.yaml（必要时从 conf/fallback_config.yaml 拷贝）兜底启动
 # - 非 systemd 模式：订阅失败/下载失败直接退出（保持手动执行的强约束）
 ############################################
@@ -19,9 +19,9 @@ trap 'rc=$?; echo "[ERR] rc=$rc line=$LINENO cmd=$BASH_COMMAND" >&2' ERR
 
 #################### 脚本初始化任务 ####################
 
-# 获取脚本工作目录绝对路径
+# 获取项目根目录（从 scripts/cmd/ 向上两级）
 export Server_Dir
-Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # 加载.env变量文件
 # shellcheck disable=SC1090
@@ -42,10 +42,11 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # 给二进制启动程序、脚本等添加可执行权限
-chmod +x "$Server_Dir/bin/"* 2>/dev/null || true
-chmod +x "$Server_Dir/scripts/"* 2>/dev/null || true
-if [ -f "$Server_Dir/tools/subconverter/subconverter" ]; then
-  chmod +x "$Server_Dir/tools/subconverter/subconverter" 2>/dev/null || true
+chmod +x "$Server_Dir/libs/clash/"* 2>/dev/null || true
+chmod +x "$Server_Dir/scripts/cmd/"* 2>/dev/null || true
+chmod +x "$Server_Dir/scripts/lib/"* 2>/dev/null || true
+if [ -f "$Server_Dir/libs/subconverter/subconverter" ]; then
+  chmod +x "$Server_Dir/libs/subconverter/subconverter" 2>/dev/null || true
 fi
 
 #################### 变量设置 ####################
@@ -93,7 +94,7 @@ URL="$(printf '%s' "$URL" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
 #让 bash 子进程能拿到
 export CLASH_URL="$URL"
 
-# 只有在“需要在线更新订阅”的模式下才强制要求 URL
+# 只有在"需要在线更新订阅"的模式下才强制要求 URL
 if [ -z "$URL" ] && [ "${SYSTEMD_MODE:-false}" != "true" ]; then
   echo "[ERR] CLASH_URL 为空（未配置订阅地址）"
   exit 2
@@ -259,14 +260,14 @@ ALLOW_INSECURE_TLS="${ALLOW_INSECURE_TLS:-false}"
 
 # 端口与配置工具
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/port_utils.sh"
+source "$Server_Dir/scripts/lib/port_utils.sh"
 CLASH_HTTP_PORT="$(resolve_port_value "HTTP" "$CLASH_HTTP_PORT")"
 CLASH_SOCKS_PORT="$(resolve_port_value "SOCKS" "$CLASH_SOCKS_PORT")"
 CLASH_REDIR_PORT="$(resolve_port_value "REDIR" "$CLASH_REDIR_PORT")"
 EXTERNAL_CONTROLLER="$(resolve_host_port "External Controller" "$EXTERNAL_CONTROLLER" "127.0.0.1")"
 
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/config_utils.sh"
+source "$Server_Dir/scripts/lib/config_utils.sh"
 
 #################### 函数定义 ####################
 
@@ -323,7 +324,7 @@ if_success() {
 }
 
 ensure_subconverter() {
-  local bin="${Server_Dir}/tools/subconverter/subconverter"
+  local bin="${Server_Dir}/libs/subconverter/subconverter"
   local port="25500"
 
   # 没有二进制直接跳过
@@ -342,7 +343,7 @@ ensure_subconverter() {
 
   # 启动（后台）
   echo "[INFO] starting subconverter..."
-  (cd "${Server_Dir}/tools/subconverter" && nohup "./subconverter" >/dev/null 2>&1 &)
+  (cd "${Server_Dir}/libs/subconverter" && nohup "./subconverter" >/dev/null 2>&1 &)
 
   # 等待端口起来
   for _ in 1 2 3 4 5; do
@@ -364,7 +365,7 @@ ensure_subconverter() {
 
 ## 获取CPU架构信息
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/get_cpu_arch.sh"
+source "$Server_Dir/scripts/lib/get_cpu_arch.sh"
 
 if [[ -z "${CpuArch:-}" ]]; then
   echo "[ERROR] Failed to obtain CPU architecture" >&2
@@ -372,7 +373,7 @@ if [[ -z "${CpuArch:-}" ]]; then
 fi
 
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/resolve_clash.sh"
+source "$Server_Dir/scripts/lib/resolve_clash.sh"
 
 ## 临时取消环境变量
 unset http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY || true
@@ -540,7 +541,7 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
       export OUT_FILE="$Temp_Dir/clash_converted.yaml"
 
       set +e
-      bash "$Server_Dir/scripts/clash_profile_conversion.sh"
+      bash "$Server_Dir/scripts/lib/profile_conversion.sh"
       conv_rc=$?
       set -e
 
@@ -572,7 +573,7 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
     fi
 
     # 5) 自检：失败则回退到旧配置（注意：脚本 set -e + trap ERR，必须 set +e 包裹）
-    BIN="${Server_Dir}/bin/clash-linux-amd64"
+    BIN="${Server_Dir}/libs/clash/clash-linux-amd64"
     NEW_CFG="$CONFIG_FILE"
     OLD_CFG="${Conf_Dir}/config.yaml"
     TEST_OUT="$Temp_Dir/config.test.out"
@@ -604,10 +605,10 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
   fi
 
   if [ "$ReturnStatus" -eq 0 ]; then
-    action "$Text3" /bin/true || true
+    action "$Text3" /bin::true || true
   else
     if [ "$SYSTEMD_MODE" = "true" ]; then
-      action "$Text4（systemd 模式：下载失败，使用旧配置/兜底配置继续启动）" /bin/false || true
+      action "$Text4（systemd 模式：下载失败，使用旧配置/兜底配置继续启动）" /bin::false || true
       echo -e "\033[33m[WARN]\033[0m Download failed, will fallback. url=${URL}" >&2
       ensure_fallback_config || true
       SKIP_CONFIG_REBUILD=true
@@ -655,12 +656,12 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
 
   # 2) 判断订阅内容是否符合 clash 配置文件标准，尝试转换（需 subconverter）
   # shellcheck disable=SC1090
-  source "$Server_Dir/scripts/resolve_subconverter.sh"
+  source "$Server_Dir/scripts/lib/resolve_subconverter.sh"
 
   if [ "${Subconverter_Ready:-false}" = "true" ]; then
     echo -e '\n判断订阅内容是否符合clash配置文件标准:'
     export SUBCONVERTER_BIN="$Subconverter_Bin"
-    bash "$Server_Dir/scripts/clash_profile_conversion.sh"
+    bash "$Server_Dir/scripts/lib/profile_conversion.sh"
     sleep 1
   else
     echo -e "\033[33m[WARN]\033[0m 未检测到可用的 subconverter，跳过订阅转换"
@@ -668,7 +669,7 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
 
   # 3) 订阅形态判断：
   # - 如果已经是完整 Clash 配置（Meta/Mihomo 常见 mixed-port / proxy-providers 等），直接用它作为运行配置
-  # - 否则才走 “proxies: 抽取 + template 拼接”
+  # - 否则才走 "proxies: 抽取 + template 拼接"
   if grep -qE '^(mixed-port:|port:|proxy-providers:|proxies:)' "$Temp_Dir/clash_config.yaml"; then
     # 情况 A：完整配置（优先）
     if grep -q '^proxies:' "$Temp_Dir/clash_config.yaml" || grep -q '^proxy-providers:' "$Temp_Dir/clash_config.yaml" || grep -q '^mixed-port:' "$Temp_Dir/clash_config.yaml" || grep -q '^port:' "$Temp_Dir/clash_config.yaml"; then
@@ -723,7 +724,7 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
   \cp "$CONFIG_FILE" "$Conf_Dir/"
 
   # 7) Dashboard external-ui（systemd+非root：把 ui 放 Temp_Dir 下，避免写 conf）
-  Work_Dir="$(cd "$(dirname "$0")" && pwd)"
+  Work_Dir="$Server_Dir"
   Dashboard_Src="${Work_Dir}/dashboard/public"
 
   if [ "$EXTERNAL_CONTROLLER_ENABLED" = "true" ]; then
@@ -841,7 +842,7 @@ if [ "$EXTERNAL_CONTROLLER_ENABLED" = "true" ]; then
     masked="${Secret:0:4}****${Secret: -4}"
     echo -e "Secret: ${masked}  (set CLASH_SHOW_SECRET=true to show full)"
   else
-    echo -e "Secret: 已生成（未显示）。查看：/opt/clash-for-linux/conf/config.yaml 或 .env"
+    echo -e "Secret: 已生成（未显示）。查看：$Server_Dir/conf/config.yaml 或 .env"
   fi
 else
   echo -e "External Controller (Dashboard) 已禁用"

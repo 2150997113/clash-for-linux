@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # 关闭 clash 服务
-Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 获取项目根目录（从 scripts/cmd/ 向上两级）
+Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 Temp_Dir="$Server_Dir/temp"
 Conf_Dir="$Server_Dir/conf"
 PID_FILE="$Temp_Dir/clash.pid"
@@ -26,7 +27,7 @@ if [ -f "$PID_FILE" ]; then
   fi
   rm -f "$PID_FILE"
 else
-  # 2) 兜底：按 “-d $Conf_Dir” 特征找（比 clash-linux- 更稳）
+  # 2) 兜底：按 "-d $Conf_Dir" 特征找（比 clash-linux- 更稳）
   # 说明：你的 start.sh 启动命令形如：<clashbin> -d "$Conf_Dir"
   PIDS="$(pgrep -f " -d ${Conf_Dir}(\s|$)" || true)"
   if [ -n "${PIDS:-}" ]; then

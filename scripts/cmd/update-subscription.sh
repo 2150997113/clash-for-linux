@@ -3,7 +3,8 @@ set -euo pipefail
 
 #################### 脚本初始化任务 ####################
 
-Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 获取项目根目录（从 scripts/cmd/ 向上两级）
+Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # 加载.env变量文件（优先使用安装目录 /opt；也支持手动指定）
 ENV_FILE_CANDIDATES=()
@@ -64,14 +65,14 @@ CLASH_HEADERS="${CLASH_HEADERS:-}"
 
 # 工具脚本
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/port_utils.sh"
+source "$Server_Dir/scripts/lib/port_utils.sh"
 CLASH_HTTP_PORT="$(resolve_port_value "HTTP" "$CLASH_HTTP_PORT")"
 CLASH_SOCKS_PORT="$(resolve_port_value "SOCKS" "$CLASH_SOCKS_PORT")"
 CLASH_REDIR_PORT="$(resolve_port_value "REDIR" "$CLASH_REDIR_PORT")"
 EXTERNAL_CONTROLLER="$(resolve_host_port "External Controller" "$EXTERNAL_CONTROLLER" "0.0.0.0")"
 
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/config_utils.sh"
+source "$Server_Dir/scripts/lib/config_utils.sh"
 
 #################### action / if_success ####################
 
@@ -156,11 +157,11 @@ fi
 
 # subconverter
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/resolve_subconverter.sh"
+source "$Server_Dir/scripts/lib/resolve_subconverter.sh"
 if [ "${Subconverter_Ready:-false}" = "true" ]; then
   echo -e '\n判断订阅内容是否符合clash配置文件标准:'
   export SUBCONVERTER_BIN="$Subconverter_Bin"
-  bash "$Server_Dir/scripts/clash_profile_conversion.sh"
+  bash "$Server_Dir/scripts/lib/profile_conversion.sh"
   sleep 1
 else
   echo -e "\033[33m[WARN] 未检测到可用的 subconverter，跳过订阅转换\033[0m"
@@ -223,8 +224,7 @@ fi
 \cp "$Temp_Dir/config.yaml" "$Conf_Dir/config.yaml"
 
 # Dashboard
-Work_Dir="$(cd "$(dirname "$0")" && pwd)"
-Dashboard_Dir="${Work_Dir}/dashboard/public"
+Dashboard_Dir="$Server_Dir/dashboard/public"
 if [ "$EXTERNAL_CONTROLLER_ENABLED" = "true" ]; then
   # 若有 external-ui 注释行则替换；否则追加
   if grep -qE '^(#\s*)?external-ui:' "$Conf_Dir/config.yaml"; then
@@ -244,4 +244,4 @@ awk -v sec="$Secret" '
 ' "$Conf_Dir/config.yaml" > "$tmpfile"
 mv "$tmpfile" "$Conf_Dir/config.yaml"
 
-echo -e "\n订阅更新完成，如需生效请执行: bash restart.sh\n"
+echo -e "\n订阅更新完成，如需生效请执行: make restart 或 bash scripts/cmd/restart-service.sh\n"
