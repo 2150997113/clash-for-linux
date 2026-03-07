@@ -49,6 +49,23 @@ case "${1:-}" in
   list)
     exec "$PROJECT_DIR/clashctl" sub list
     ;;
+  proxy)
+    action="${2:-}"
+    case "$action" in
+      up)
+        source /etc/profile.d/clash-for-linux.sh && proxy_on
+        exit 0
+        ;;
+      down)
+        source /etc/profile.d/clash-for-linux.sh && proxy_down
+        exit 0
+        ;;
+      *)
+        echo "[ERROR] 用法: m proxy up|down" >&2
+        exit 1
+        ;;
+    esac
+    ;;
 esac
 
 # 其他命令透传给 make
