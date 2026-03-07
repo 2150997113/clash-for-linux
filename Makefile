@@ -4,7 +4,7 @@
 SHELL := /bin/bash
 CMD := scripts/cmd
 
-.PHONY: install uninstall start stop restart update status \
+.PHONY: install uninstall start stop restart update status env \
         sub-add sub-list sub-use sub-update help
 
 # ==================== 服务生命周期 ====================
@@ -29,6 +29,13 @@ update:
 
 status:
 	@./clashctl status
+
+env:
+	@echo "source /etc/profile.d/clash-for-linux.sh"
+	@echo "提示: 环境变量需要在当前 shell 中生效，请执行:"
+	@echo "  source /etc/profile.d/clash-for-linux.sh"
+	@echo ""
+	@echo "或者使用 proxy_on/proxy_off 切换代理"
 
 # ==================== 订阅管理 ====================
 

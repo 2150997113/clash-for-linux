@@ -123,7 +123,7 @@ unset http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY || true
 # 检测订阅地址
 info "检测订阅地址..."
 
-local check_cmd=(curl -o /dev/null -L -sS --retry 3 -m 10 -w "%{http_code}")
+check_cmd=(curl -o /dev/null -L -sS --retry 3 -m 10 -w "%{http_code}")
 [ "${ALLOW_INSECURE_TLS}" = "true" ] && check_cmd+=(-k) && \
   warn "已启用不安全的 TLS 下载（跳过证书校验）"
 [ -n "${CLASH_HEADERS}" ] && check_cmd+=(-H "$CLASH_HEADERS")
@@ -131,7 +131,7 @@ check_cmd+=("$URL")
 
 set +e
 status_code="$("${check_cmd[@]}" 2>/dev/null)"
-local check_rc=$?
+check_rc=$?
 set -e
 
 if [ $check_rc -ne 0 ] || ! echo "$status_code" | grep -qE '^[23][0-9]{2}$'; then
@@ -215,7 +215,7 @@ cp "$TEMP_DIR/config.yaml" "$CONF_DIR/config.yaml"
 
 # Dashboard
 if [ "$EXTERNAL_CONTROLLER_ENABLED" = "true" ]; then
-  local dashboard_dir="$SERVER_DIR/dashboard/public"
+  dashboard_dir="$SERVER_DIR/dashboard/public"
   [ -d "$dashboard_dir" ] && upsert_yaml_kv "$CONF_DIR/config.yaml" "external-ui" "$dashboard_dir"
 fi
 

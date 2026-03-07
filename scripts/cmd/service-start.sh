@@ -51,6 +51,11 @@ source "$SERVER_DIR/scripts/lib/clash-resolve.sh"
 source "$SERVER_DIR/scripts/lib/port-check.sh"
 
 # =========================
+# Mihomo 安全路径设置
+# =========================
+export SAFE_PATHS="${SAFE_PATHS:-$SERVER_DIR:$HOME/.config/mihomo}"
+
+# =========================
 # 变量设置
 # =========================
 CONF_DIR="$SERVER_DIR/conf"
@@ -253,14 +258,14 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
   info "检测订阅地址..."
 
   # 检测订阅可访问性
-  local check_cmd=(curl -o /dev/null -L -sS --retry 3 -m 10 -w "%{http_code}")
+  check_cmd=(curl -o /dev/null -L -sS --retry 3 -m 10 -w "%{http_code}")
   [ "${ALLOW_INSECURE_TLS}" = "true" ] && check_cmd+=(-k)
   [ -n "${CLASH_HEADERS:-}" ] && check_cmd+=(-H "$CLASH_HEADERS")
   check_cmd+=("$URL")
 
   set +e
   status_code="$("${check_cmd[@]}" 2>/dev/null)"
-  local check_rc=$?
+  check_rc=$?
   set -e
 
   if [ $check_rc -ne 0 ] || ! echo "$status_code" | grep -qE '^[23][0-9]{2}$'; then
@@ -306,7 +311,7 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
 
       set +e
       bash "$SERVER_DIR/scripts/lib/profile-convert.sh"
-      local conv_rc=$?
+      conv_rc=$?
       set -e
 
       if [ $conv_rc -eq 0 ] && [ -s "$OUT_FILE" ]; then
@@ -352,7 +357,7 @@ if [ "${SYSTEMD_MODE:-false}" = "true" ]; then
 else
   info "后台启动 (nohup)"
   nohup "$Clash_Bin" -f "$CONFIG_FILE" -d "$CONF_DIR" >>"$LOG_DIR/clash.log" 2>&1 &
-  local pid=$!
+  pid=$!
   echo "$pid" > "$PID_FILE"
   ok "服务启动成功 (PID: $pid)"
 fi
@@ -363,7 +368,7 @@ fi
 echo ""
 if [ "${EXTERNAL_CONTROLLER_ENABLED:-true}" = "true" ]; then
   echo "Clash Dashboard: http://${EXTERNAL_CONTROLLER}/ui"
-  local masked="${SECRET:0:4}****${SECRET: -4}"
+  masked="${SECRET:0:4}****${SECRET: -4}"
   echo "SECRET: ${masked}"
 else
   echo "External Controller 已禁用"

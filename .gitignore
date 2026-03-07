@@ -13,3 +13,12 @@ temp/*.pid
 volumes/geoip/*.mmdb
 volumes/mixin.d/*.yaml
 volumes/mixin.d/*.yml
+
+# 运行时生成的配置文件
+conf/GeoSite.dat
+conf/cache.db
+conf/ui
+
+# subconverter 运行时文件
+libs/subconverter/pref.ini
+libs/subconverter/subconverter
