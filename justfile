@@ -7,6 +7,10 @@ CMD := "scripts/cmd"
 default:
     just --list
 
+# 检查依赖（make 和 just）
+check:
+    @bash check-deps.sh
+
 # ==================== 服务管理 ====================
 
 # 安装服务

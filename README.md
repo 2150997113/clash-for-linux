@@ -47,9 +47,28 @@
 
 ## 🚀 一键安装（推荐）
 
-```
+```bash
 git clone --branch master --depth 1 https://github.com/wnlen/clash-for-linux.git
 cd clash-for-linux
+```
+
+### 检查依赖
+
+本项目依赖 `make` 和 `just`，运行以下命令检查并自动安装：
+
+```bash
+bash check-deps.sh
+```
+
+或使用 Makefile 快捷命令：
+
+```bash
+make check
+```
+
+### 安装服务
+
+```bash
 sudo make install
 ```
 
