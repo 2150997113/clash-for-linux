@@ -188,7 +188,7 @@ subscription_update() {
 		exit 1
 	fi
 	subscription_use "$name"
-	run_script "scripts/cmd/update-subscription.sh"
+	run_script "scripts/cmd/subscription-update.sh"
 	subscription_touch "$name"
 	echo "[OK] 订阅已更新: $name"
 }
@@ -246,13 +246,13 @@ run_script() {
 command=${1:-}
 case "$command" in
 	start)
-		action_with_systemd start || run_script "scripts/cmd/start-service.sh"
+		action_with_systemd start || run_script "scripts/cmd/service-start.sh"
 		;;
 	stop)
-		action_with_systemd stop || run_script "scripts/cmd/shutdown.sh"
+		action_with_systemd stop || run_script "scripts/cmd/service-stop.sh"
 		;;
 	restart)
-		action_with_systemd restart || run_script "scripts/cmd/restart-service.sh"
+		action_with_systemd restart || run_script "scripts/cmd/service-restart.sh"
 		;;
 	status)
 		if use_systemd; then
@@ -263,7 +263,7 @@ case "$command" in
 		status_fallback
 		;;
 	update)
-		run_script "scripts/cmd/update-subscription.sh"
+		run_script "scripts/cmd/subscription-update.sh"
 		;;
 	set-url)
 		set_url "${2:-}"

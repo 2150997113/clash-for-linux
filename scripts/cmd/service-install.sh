@@ -119,11 +119,11 @@ chmod +x "$Install_Dir/clashctl" 2>/dev/null || true
 # shellcheck disable=SC1090
 source "$Install_Dir/.env"
 # shellcheck disable=SC1090
-source "$Install_Dir/scripts/lib/get_cpu_arch.sh"
+source "$Install_Dir/scripts/lib/cpu-arch.sh"
 # shellcheck disable=SC1090
-source "$Install_Dir/scripts/lib/resolve_clash.sh"
+source "$Install_Dir/scripts/lib/clash-resolve.sh"
 # shellcheck disable=SC1090
-source "$Install_Dir/scripts/lib/port_utils.sh"
+source "$Install_Dir/scripts/lib/port-check.sh"
 
 if [[ -z "${CpuArch:-}" ]]; then
   err "无法识别 CPU 架构"
@@ -364,7 +364,7 @@ fi
 
 if [ "$Systemd_Usable" = "true" ]; then
   if [ "${CLASH_ENABLE_SERVICE:-true}" = "true" ] || [ "${CLASH_START_SERVICE:-true}" = "true" ]; then
-    CLASH_SERVICE_USER="$Service_User" CLASH_SERVICE_GROUP="$Service_Group" "$Install_Dir/scripts/cmd/setup-systemd.sh"
+    CLASH_SERVICE_USER="$Service_User" CLASH_SERVICE_GROUP="$Service_Group" "$Install_Dir/scripts/cmd/systemd-setup.sh"
 
     if [ "${CLASH_ENABLE_SERVICE:-true}" = "true" ]; then
       systemctl enable "${Service_Name}.service" >/dev/null 2>&1 || true

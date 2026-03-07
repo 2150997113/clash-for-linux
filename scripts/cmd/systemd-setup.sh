@@ -40,8 +40,8 @@ Type=simple
 WorkingDirectory=$Server_Dir
 
 # 启动 / 停止
-ExecStart=/bin/bash $Server_Dir/scripts/cmd/start-service.sh
-ExecStop=/bin/bash $Server_Dir/scripts/cmd/shutdown.sh
+ExecStart=/bin/bash $Server_Dir/scripts/cmd/service-start.sh
+ExecStop=/bin/bash $Server_Dir/scripts/cmd/service-stop.sh
 
 # 失败策略
 Restart=on-failure

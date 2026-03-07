@@ -39,9 +39,9 @@ info "Install_Dir=${Install_Dir}"
 # =========================
 # 1) 优雅停止（优先 shutdown.sh，再 systemd）
 # =========================
-if [ -f "${Install_Dir}/scripts/cmd/shutdown.sh" ]; then
-  info "执行 shutdown.sh（优雅停止）..."
-  bash "${Install_Dir}/scripts/cmd/shutdown.sh" >/dev/null 2>&1 || true
+if [ -f "${Install_Dir}/scripts/cmd/service-stop.sh" ]; then
+  info "执行 service-stop.sh（优雅停止）..."
+  bash "${Install_Dir}/scripts/cmd/service-stop.sh" >/dev/null 2>&1 || true
 fi
 
 if command -v systemctl >/dev/null 2>&1; then

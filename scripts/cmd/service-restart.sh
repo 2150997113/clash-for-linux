@@ -44,7 +44,7 @@ Temp_Dir="$Server_Dir/temp"
 PID_FILE="$Temp_Dir/clash.pid"
 
 if [ "$1" = "--update" ]; then
-	bash "$Server_Dir/scripts/cmd/update-subscription.sh" || exit 1
+	bash "$Server_Dir/scripts/cmd/subscription-update.sh" || exit 1
 fi
 
 ## 关闭clash服务
@@ -93,13 +93,13 @@ sleep 3
 
 ## 获取CPU架构
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/get_cpu_arch.sh"
+source "$Server_Dir/scripts/lib/cpu-arch.sh"
 
 ## 重启启动clash服务
 Text5="服务启动成功！"
 Text6="服务启动失败！"
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/resolve_clash.sh"
+source "$Server_Dir/scripts/lib/clash-resolve.sh"
 Clash_Bin="$(resolve_clash_bin "$Server_Dir" "$CpuArch")"
 ReturnStatus=$?
 

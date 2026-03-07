@@ -65,14 +65,14 @@ CLASH_HEADERS="${CLASH_HEADERS:-}"
 
 # 工具脚本
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/port_utils.sh"
+source "$Server_Dir/scripts/lib/port-check.sh"
 CLASH_HTTP_PORT="$(resolve_port_value "HTTP" "$CLASH_HTTP_PORT")"
 CLASH_SOCKS_PORT="$(resolve_port_value "SOCKS" "$CLASH_SOCKS_PORT")"
 CLASH_REDIR_PORT="$(resolve_port_value "REDIR" "$CLASH_REDIR_PORT")"
 EXTERNAL_CONTROLLER="$(resolve_host_port "External Controller" "$EXTERNAL_CONTROLLER" "0.0.0.0")"
 
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/config_utils.sh"
+source "$Server_Dir/scripts/lib/config-check.sh"
 
 #################### action / if_success ####################
 
@@ -157,11 +157,11 @@ fi
 
 # subconverter
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/resolve_subconverter.sh"
+source "$Server_Dir/scripts/lib/subconverter-resolve.sh"
 if [ "${Subconverter_Ready:-false}" = "true" ]; then
   echo -e '\n判断订阅内容是否符合clash配置文件标准:'
   export SUBCONVERTER_BIN="$Subconverter_Bin"
-  bash "$Server_Dir/scripts/lib/profile_conversion.sh"
+  bash "$Server_Dir/scripts/lib/profile-convert.sh"
   sleep 1
 else
   echo -e "\033[33m[WARN] 未检测到可用的 subconverter，跳过订阅转换\033[0m"
@@ -244,4 +244,4 @@ awk -v sec="$Secret" '
 ' "$Conf_Dir/config.yaml" > "$tmpfile"
 mv "$tmpfile" "$Conf_Dir/config.yaml"
 
-echo -e "\n订阅更新完成，如需生效请执行: make restart 或 bash scripts/cmd/restart-service.sh\n"
+echo -e "\n订阅更新完成，如需生效请执行: make restart 或 bash scripts/cmd/service-restart.sh\n"

@@ -10,22 +10,22 @@ CMD := scripts/cmd
 # ==================== 服务生命周期 ====================
 
 install:
-	@sudo bash $(CMD)/install-service.sh
+	@sudo bash $(CMD)/service-install.sh
 
 uninstall:
-	@sudo bash $(CMD)/uninstall-service.sh
+	@sudo bash $(CMD)/service-uninstall.sh
 
 start:
-	@bash $(CMD)/start-service.sh
+	@bash $(CMD)/service-start.sh
 
 stop:
-	@bash $(CMD)/shutdown.sh
+	@bash $(CMD)/service-stop.sh
 
 restart:
-	@bash $(CMD)/restart-service.sh
+	@bash $(CMD)/service-restart.sh
 
 update:
-	@bash $(CMD)/update-subscription.sh
+	@bash $(CMD)/subscription-update.sh
 
 status:
 	@./clashctl status

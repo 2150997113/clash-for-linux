@@ -260,14 +260,14 @@ ALLOW_INSECURE_TLS="${ALLOW_INSECURE_TLS:-false}"
 
 # 端口与配置工具
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/port_utils.sh"
+source "$Server_Dir/scripts/lib/port-check.sh"
 CLASH_HTTP_PORT="$(resolve_port_value "HTTP" "$CLASH_HTTP_PORT")"
 CLASH_SOCKS_PORT="$(resolve_port_value "SOCKS" "$CLASH_SOCKS_PORT")"
 CLASH_REDIR_PORT="$(resolve_port_value "REDIR" "$CLASH_REDIR_PORT")"
 EXTERNAL_CONTROLLER="$(resolve_host_port "External Controller" "$EXTERNAL_CONTROLLER" "127.0.0.1")"
 
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/config_utils.sh"
+source "$Server_Dir/scripts/lib/config-check.sh"
 
 #################### 函数定义 ####################
 
@@ -365,7 +365,7 @@ ensure_subconverter() {
 
 ## 获取CPU架构信息
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/get_cpu_arch.sh"
+source "$Server_Dir/scripts/lib/cpu-arch.sh"
 
 if [[ -z "${CpuArch:-}" ]]; then
   echo "[ERROR] Failed to obtain CPU architecture" >&2
@@ -373,7 +373,7 @@ if [[ -z "${CpuArch:-}" ]]; then
 fi
 
 # shellcheck disable=SC1090
-source "$Server_Dir/scripts/lib/resolve_clash.sh"
+source "$Server_Dir/scripts/lib/clash-resolve.sh"
 
 ## 临时取消环境变量
 unset http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY || true
@@ -541,7 +541,7 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
       export OUT_FILE="$Temp_Dir/clash_converted.yaml"
 
       set +e
-      bash "$Server_Dir/scripts/lib/profile_conversion.sh"
+      bash "$Server_Dir/scripts/lib/profile-convert.sh"
       conv_rc=$?
       set -e
 
@@ -656,12 +656,12 @@ if [ "$SKIP_CONFIG_REBUILD" != "true" ]; then
 
   # 2) 判断订阅内容是否符合 clash 配置文件标准，尝试转换（需 subconverter）
   # shellcheck disable=SC1090
-  source "$Server_Dir/scripts/lib/resolve_subconverter.sh"
+  source "$Server_Dir/scripts/lib/subconverter-resolve.sh"
 
   if [ "${Subconverter_Ready:-false}" = "true" ]; then
     echo -e '\n判断订阅内容是否符合clash配置文件标准:'
     export SUBCONVERTER_BIN="$Subconverter_Bin"
-    bash "$Server_Dir/scripts/lib/profile_conversion.sh"
+    bash "$Server_Dir/scripts/lib/profile-convert.sh"
     sleep 1
   else
     echo -e "\033[33m[WARN]\033[0m 未检测到可用的 subconverter，跳过订阅转换"
