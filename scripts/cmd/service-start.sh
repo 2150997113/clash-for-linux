@@ -53,7 +53,7 @@ source "$SERVER_DIR/scripts/lib/port-check.sh"
 # =========================
 # Mihomo 安全路径设置
 # =========================
-export SAFE_PATHS="${SAFE_PATHS:-$SERVER_DIR:$HOME/.config/mihomo}"
+export SAFE_PATHS="${SAFE_PATHS:-$SERVER_DIR:${HOME:-/root}/.config/mihomo}"
 
 # =========================
 # 变量设置

@@ -4,8 +4,8 @@
 SHELL := /bin/bash
 CMD := scripts/cmd
 
-.PHONY: install uninstall start stop restart update status env \
-        sub-add sub-list sub-use sub-update help
+.PHONY: install uninstall start stop down restart update status test env \
+        proxy-up proxy-down sub-add sub-list sub-use sub-update help
 
 # ==================== 服务生命周期 ====================
 
@@ -21,6 +21,8 @@ start:
 stop:
 	@bash $(CMD)/service-stop.sh
 
+down: stop
+
 restart:
 	@bash $(CMD)/service-restart.sh
 
@@ -29,6 +31,17 @@ update:
 
 status:
 	@./clashctl status
+
+test:
+	@source /etc/profile.d/clash-for-linux.sh && proxy_on && \
+	curl -s --max-time 5 https://www.google.com -o /dev/null && \
+	echo "[OK] Google 可访问" || echo "[FAIL] 代理不可用"
+
+proxy-up:
+	@source /etc/profile.d/clash-for-linux.sh && proxy_on
+
+proxy-down:
+	@source /etc/profile.d/clash-for-linux.sh && proxy_down
 
 env:
 	@SERVER_DIR="$$(cd "$(dirname "$$0")" && pwd)"; \
@@ -71,10 +84,15 @@ help:
 	@echo "  make install      安装服务"
 	@echo "  make uninstall    卸载服务"
 	@echo "  make start        启动服务"
-	@echo "  make stop         停止服务"
+	@echo "  make stop/down    停止服务"
 	@echo "  make restart      重启服务"
 	@echo "  make update       更新订阅"
 	@echo "  make status       查看状态"
+	@echo "  make test         测试代理连通性"
+	@echo ""
+	@echo "代理快捷命令:"
+	@echo "  make proxy-up     开启代理 (等效 proxy-on)"
+	@echo "  make proxy-down   关闭代理 (等效 proxy-down)"
 	@echo ""
 	@echo "订阅管理:"
 	@echo "  make sub-add      添加订阅"
