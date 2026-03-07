@@ -31,11 +31,19 @@ status:
 	@./clashctl status
 
 env:
-	@echo "source /etc/profile.d/clash-for-linux.sh"
-	@echo "提示: 环境变量需要在当前 shell 中生效，请执行:"
+	@SERVER_DIR="$$(cd "$(dirname "$$0")" && pwd)"; \
+	if [ ! -f /etc/profile.d/clash-for-linux.sh ]; then \
+		echo "[INFO] 生成 /etc/profile.d/clash-for-linux.sh ..."; \
+		source "$$SERVER_DIR/scripts/lib/systemd-utils.sh" && install_profiled "$$SERVER_DIR"; \
+		echo "[OK] 文件已生成"; \
+	else \
+		echo "[OK] /etc/profile.d/clash-for-linux.sh 已存在"; \
+	fi
+	@echo ""
+	@echo "请在当前 shell 执行以下命令使别名生效:"
 	@echo "  source /etc/profile.d/clash-for-linux.sh"
 	@echo ""
-	@echo "或者使用 proxy_on/proxy_off 切换代理"
+	@echo "可用命令: proxy-on / proxy-off / proxy_on / proxy_off"
 
 # ==================== 订阅管理 ====================
 

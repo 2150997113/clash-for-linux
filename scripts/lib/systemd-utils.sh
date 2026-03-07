@@ -66,6 +66,10 @@ proxy_status() {
   echo "https_proxy=\${https_proxy:-<empty>}"
   echo "all_proxy=\${all_proxy:-<empty>}"
 }
+
+# 简化别名（带连字符）
+alias proxy-on='source /etc/profile.d/clash-for-linux.sh && proxy_on'
+alias proxy-off='source /etc/profile.d/clash-for-linux.sh && proxy_off'
 EOF
 
   chmod 644 "$profiled_file"
