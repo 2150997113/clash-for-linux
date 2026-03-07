@@ -1,6 +1,5 @@
 # 项目文档
 docs/
-CLAUDE.md
 
 # 运行时目录
 logs/*.log
