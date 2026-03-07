@@ -5,7 +5,8 @@ SHELL := /bin/bash
 CMD := scripts/cmd
 
 .PHONY: install uninstall start stop down restart update status test env \
-        proxy-up proxy-down sub-add sub-list sub-use sub-del sub-update help
+        proxy-up proxy-down sub-add sub-list sub-use sub-del sub-update help \
+        use del add list
 
 # ==================== 服务生命周期 ====================
 
@@ -59,9 +60,27 @@ env:
 	@echo "可用命令: proxy-on / proxy-down / proxy_on / proxy_down"
 
 # ==================== 订阅管理 ====================
-# 支持环境变量: make sub-add name=xxx url=xxx [headers=xxx]
-# 支持环境变量: make sub-use name=xxx
+# 快捷命令: make use <name> | make del <name> | make add-<name> url=xxx
+# 完整命令: make sub-add [name= url=] | make sub-use [name=] | make sub-del [name=]
 
+# 快捷命令（推荐）
+use-%:
+	@./clashctl sub use "$*"
+
+del-%:
+	@./clashctl sub del "$*"
+
+add-%:
+	@if [ -z "$(url)" ]; then \
+		echo "[ERROR] 用法: make add-$* url=\"https://...\" [headers=\"...\"]"; \
+		exit 1; \
+	fi
+	@./clashctl sub add "$*" "$(url)" "$(headers:-)"
+
+list:
+	@./clashctl sub list
+
+# 完整命令（兼容）
 sub-add:
 	@if [ -n "${name}" ] && [ -n "${url}" ]; then \
 		./clashctl sub add "${name}" "${url}" "${headers:-}"; \
@@ -112,11 +131,10 @@ help:
 	@echo "  make proxy-up     开启代理 (等效 proxy-on)"
 	@echo "  make proxy-down   关闭代理 (等效 proxy-down)"
 	@echo ""
-	@echo "订阅管理:"
-	@echo "  make sub-add [name=xxx url=xxx headers=xxx]  添加订阅"
-	@echo "  make sub-list                                列出订阅"
-	@echo "  make sub-use [name=xxx]                      切换订阅"
-	@echo "  make sub-del [name=xxx]                      删除订阅"
-	@echo "  make sub-update [name=xxx]                   更新订阅"
+	@echo "订阅管理 (m 命令):"
+	@echo "  m list                       列出订阅"
+	@echo "  m use <name>                 切换订阅"
+	@echo "  m del <name>                 删除订阅"
+	@echo "  m add <name> url=xxx         添加订阅"
 	@echo ""
 	@echo "详细命令: ./clashctl --help"

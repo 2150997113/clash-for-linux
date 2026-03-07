@@ -89,6 +89,7 @@ fi
 [ -f "/etc/profile.d/clash-for-linux.sh" ] && rm -f "/etc/profile.d/clash-for-linux.sh" && ok "已移除: /etc/profile.d/clash-for-linux.sh"
 [ -f "${INSTALL_DIR}/temp/clash-for-linux.sh" ] && rm -f "${INSTALL_DIR}/temp/clash-for-linux.sh" && ok "已移除: ${INSTALL_DIR}/temp/clash-for-linux.sh"
 [ -f "/usr/local/bin/clashctl" ] && rm -f "/usr/local/bin/clashctl" && ok "已移除: /usr/local/bin/clashctl"
+[ -f "/usr/local/bin/m" ] && rm -f "/usr/local/bin/m" && ok "已移除: /usr/local/bin/m"
 
 # =========================
 # 4) 完成

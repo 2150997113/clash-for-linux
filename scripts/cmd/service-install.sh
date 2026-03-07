@@ -178,9 +178,10 @@ fi
 install_profiled "$INSTALL_DIR" "$CLASH_HTTP_PORT" "$CLASH_SOCKS_PORT" || true
 
 # =========================
-# 安装 clashctl 命令
+# 安装 clashctl 和 m 命令
 # =========================
-[ -f "$INSTALL_DIR/clashctl" ] && install -m 0755 "$INSTALL_DIR/clashctl" /usr/local/bin/clashctl
+[ -f "$INSTALL_DIR/clashctl" ] && ln -sf "$INSTALL_DIR/clashctl" /usr/local/bin/clashctl
+[ -f "$INSTALL_DIR/m" ] && ln -sf "$INSTALL_DIR/m" /usr/local/bin/m
 
 # =========================
 # 安装完成输出
