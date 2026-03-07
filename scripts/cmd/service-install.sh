@@ -2,94 +2,37 @@
 set -euo pipefail
 
 # =========================
-# 基础参数
+# Clash for Linux - 安装脚本
 # =========================
-# 获取项目根目录（从 scripts/cmd/ 向上两级）
+
+# 获取项目根目录
 Server_Dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# 项目所在位置即安装位置（不再拷贝到 /opt）
 Install_Dir="$Server_Dir"
 Service_Name="clash-for-linux"
 Service_User="root"
 Service_Group="root"
 
 # =========================
-# 彩色输出（统一 printf + 自动降级 + 手动关色）
+# 加载公共库
 # =========================
+# shellcheck disable=SC1090
+source "$Install_Dir/scripts/lib/output.sh"
+output_init "$@"
 
-# ---- 关色开关（优先级最高）----
-NO_COLOR_FLAG=0
-for arg in "$@"; do
-  case "$arg" in
-    --no-color|--nocolor)
-      NO_COLOR_FLAG=1
-      ;;
-  esac
-done
+# shellcheck disable=SC1090
+source "$Install_Dir/scripts/lib/env-utils.sh"
 
-if [[ -n "${NO_COLOR:-}" ]] || [[ -n "${CLASH_NO_COLOR:-}" ]]; then
-  NO_COLOR_FLAG=1
-fi
+# shellcheck disable=SC1090
+source "$Install_Dir/scripts/lib/systemd-utils.sh"
 
-# ---- 初始化颜色 ----
-if [[ "$NO_COLOR_FLAG" -eq 0 ]] && [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
-  if tput setaf 1 >/dev/null 2>&1; then
-    C_RED="$(tput setaf 1)"
-    C_GREEN="$(tput setaf 2)"
-    C_YELLOW="$(tput setaf 3)"
-    C_BLUE="$(tput setaf 4)"
-    C_CYAN="$(tput setaf 6)"
-    C_GRAY="$(tput setaf 8 2>/dev/null || true)"
-    C_BOLD="$(tput bold)"
-    C_UL="$(tput smul)"
-    C_NC="$(tput sgr0)"
-  fi
-fi
+# shellcheck disable=SC1090
+source "$Install_Dir/scripts/lib/cpu-arch.sh"
 
-# ---- ANSI fallback ----
-if [[ "$NO_COLOR_FLAG" -eq 0 ]] && [[ -t 1 ]] && [[ -z "${C_NC:-}" ]]; then
-  C_RED=$'\033[31m'
-  C_GREEN=$'\033[32m'
-  C_YELLOW=$'\033[33m'
-  C_BLUE=$'\033[34m'
-  C_CYAN=$'\033[36m'
-  C_GRAY=$'\033[90m'
-  C_BOLD=$'\033[1m'
-  C_UL=$'\033[4m'
-  C_NC=$'\033[0m'
-fi
+# shellcheck disable=SC1090
+source "$Install_Dir/scripts/lib/clash-resolve.sh"
 
-# ---- 强制无色 ----
-if [[ "$NO_COLOR_FLAG" -eq 1 ]] || [[ ! -t 1 ]]; then
-  C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_CYAN='' C_GRAY='' C_BOLD='' C_UL='' C_NC=''
-fi
-
-# =========================
-# 基础输出函数
-# =========================
-log()   { printf "%b\n" "$*"; }
-info()  { log "${C_CYAN}[INFO]${C_NC} $*"; }
-ok()    { log "${C_GREEN}[OK]${C_NC} $*"; }
-warn()  { log "${C_YELLOW}[WARN]${C_NC} $*"; }
-err()   { log "${C_RED}[ERROR]${C_NC} $*"; }
-
-# =========================
-# 样式助手
-# =========================
-path()  { printf "%b" "${C_BOLD}$*${C_NC}"; }
-cmd()   { printf "%b" "${C_GRAY}$*${C_NC}"; }
-url()   { printf "%b" "${C_UL}$*${C_NC}"; }
-good()  { printf "%b" "${C_GREEN}$*${C_NC}"; }
-bad()   { printf "%b" "${C_RED}$*${C_NC}"; }
-
-# =========================
-# 分段标题（CLI 风格 section）
-# =========================
-section() {
-  local title="$*"
-  log ""
-  log "${C_BOLD}▶ ${title}${C_NC}"
-  log "${C_GRAY}────────────────────────────────────────${C_NC}"
-}
+# shellcheck disable=SC1090
+source "$Install_Dir/scripts/lib/port-check.sh"
 
 # =========================
 # 前置校验
@@ -104,6 +47,10 @@ if [ ! -f "${Server_Dir}/.env" ]; then
   exit 1
 fi
 
+# 加载环境变量
+# shellcheck disable=SC1090
+source "$Install_Dir/.env"
+
 # =========================
 # 设置权限
 # =========================
@@ -114,16 +61,11 @@ chmod +x "$Install_Dir/libs/subconverter/"*/subconverter 2>/dev/null || true
 chmod +x "$Install_Dir/clashctl" 2>/dev/null || true
 
 # =========================
-# 加载环境与依赖脚本
+# CPU 架构检测
 # =========================
-# shellcheck disable=SC1090
-source "$Install_Dir/.env"
-# shellcheck disable=SC1090
-source "$Install_Dir/scripts/lib/cpu-arch.sh"
-# shellcheck disable=SC1090
-source "$Install_Dir/scripts/lib/clash-resolve.sh"
-# shellcheck disable=SC1090
-source "$Install_Dir/scripts/lib/port-check.sh"
+if [[ -z "${CpuArch:-}" ]]; then
+  get_cpu_arch
+fi
 
 if [[ -z "${CpuArch:-}" ]]; then
   err "无法识别 CPU 架构"
@@ -132,52 +74,17 @@ fi
 info "CPU architecture: ${CpuArch}"
 
 # =========================
-# .env 写入工具：write_env_kv（必须在 prompt 之前定义）
-# - 自动创建文件
-# - 存在则替换，不存在则追加
-# - 统一写成：export KEY="VALUE"
-# - 自动转义双引号/反斜杠
+# 交互式填写订阅地址
 # =========================
-escape_env_value() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
-}
-
-write_env_kv() {
-  local file="$1"
-  local key="$2"
-  local val="$3"
-
-  mkdir -p "$(dirname "$file")" 2>/dev/null || true
-  [ -f "$file" ] || touch "$file"
-
-  val="$(printf '%s' "$val" | tr -d '\r')"
-  local esc
-  esc="$(escape_env_value "$val")"
-
-  if grep -qE "^[[:space:]]*(export[[:space:]]+)?${key}=" "$file"; then
-    sed -i -E "s|^[[:space:]]*(export[[:space:]]+)?${key}=.*|export ${key}=\"${esc}\"|g" "$file"
-  else
-    printf 'export %s="%s"\n' "$key" "$esc" >> "$file"
-  fi
-}
-
-# =========================
-# 交互式填写订阅地址（仅在 CLASH_URL 为空时触发）
-# - 若非 TTY（CI/管道）则跳过交互
-# - 若用户回车跳过，则保持原行为：装完提示手动配置
-# =========================
-prompt_clash_url_if_empty() {
-  # 兼容 .env 里可能是 CLASH_URL= / export CLASH_URL= / 带引号
+prompt_clash_url() {
   local cur="${CLASH_URL:-}"
   cur="${cur%\"}"; cur="${cur#\"}"
 
-  if [ -n "$cur" ]; then
-    return 0
-  fi
+  [ -n "$cur" ] && return 0
 
-  # 非交互环境：不阻塞
+  # 非交互环境
   if [ ! -t 0 ]; then
-    warn "CLASH_URL 为空且当前为非交互环境（stdin 非 TTY），将跳过输入引导。"
+    warn "CLASH_URL 为空且当前为非交互环境，将跳过输入引导。"
     return 0
   fi
 
@@ -188,55 +95,35 @@ prompt_clash_url_if_empty() {
 
   input_url="$(printf '%s' "$input_url" | tr -d '\r')"
 
-  # 回车跳过：保持原行为（不写入）
   if [ -z "$input_url" ]; then
     warn "已跳过填写订阅地址，安装完成后请手动编辑：${Install_Dir}/.env"
     return 0
   fi
 
-  # 先校验再写入，避免污染 .env
   if ! echo "$input_url" | grep -Eq '^https?://'; then
     err "订阅地址格式不正确（必须以 http:// 或 https:// 开头）"
     exit 1
   fi
 
-  ENV_FILE="${Install_Dir}/.env"
-  mkdir -p "$Install_Dir"
-  [ -f "$ENV_FILE" ] || touch "$ENV_FILE"
-
-  # ✅ 只用这一套写入逻辑（统一 export KEY="..."，兼容旧格式）
-  write_env_kv "$ENV_FILE" "CLASH_URL" "$input_url"
-
+  write_env_kv "${Install_Dir}/.env" "CLASH_URL" "$input_url"
   export CLASH_URL="$input_url"
-  ok "已写入订阅地址到：${ENV_FILE}"
+  ok "已写入订阅地址到：${Install_Dir}/.env"
 }
 
-prompt_clash_url_if_empty
+prompt_clash_url
 
 # =========================
-# 端口冲突检测（保持你原逻辑）
+# 端口冲突检测
 # =========================
-CLASH_HTTP_PORT=${CLASH_HTTP_PORT:-7890}
-CLASH_SOCKS_PORT=${CLASH_SOCKS_PORT:-7891}
-CLASH_REDIR_PORT=${CLASH_REDIR_PORT:-7892}
-EXTERNAL_CONTROLLER=${EXTERNAL_CONTROLLER:-127.0.0.1:9090}
-
-parse_port() {
-  local raw="$1"
-  raw="${raw##*:}"
-  echo "$raw"
-}
+CLASH_HTTP_PORT="${CLASH_HTTP_PORT:-7890}"
+CLASH_SOCKS_PORT="${CLASH_SOCKS_PORT:-7891}"
+CLASH_REDIR_PORT="${CLASH_REDIR_PORT:-7892}"
+EXTERNAL_CONTROLLER="${EXTERNAL_CONTROLLER:-127.0.0.1:9090}"
 
 Port_Conflicts=()
-for port in "$CLASH_HTTP_PORT" "$CLASH_SOCKS_PORT" "$CLASH_REDIR_PORT" "$(parse_port "$EXTERNAL_CONTROLLER")"; do
-  if [ "$port" = "auto" ] || [ -z "$port" ]; then
-    continue
-  fi
-  if [[ "$port" =~ ^[0-9]+$ ]]; then
-    if is_port_in_use "$port"; then
-      Port_Conflicts+=("$port")
-    fi
-  fi
+for port in "$CLASH_HTTP_PORT" "$CLASH_SOCKS_PORT" "$CLASH_REDIR_PORT" "${EXTERNAL_CONTROLLER##*:}"; do
+  [ "$port" = "auto" ] || [ -z "$port" ] && continue
+  [[ "$port" =~ ^[0-9]+$ ]] && is_port_in_use "$port" && Port_Conflicts+=("$port")
 done
 
 if [ "${#Port_Conflicts[@]}" -ne 0 ]; then
@@ -246,7 +133,7 @@ fi
 install -d -m 0755 "$Install_Dir/conf" "$Install_Dir/logs" "$Install_Dir/temp"
 
 # =========================
-# Clash 内核就绪检查/下载
+# Clash 内核检查
 # =========================
 if ! resolve_clash_bin "$Install_Dir" "$CpuArch" >/dev/null 2>&1; then
   err "Clash 内核未就绪，请检查下载配置或手动放置二进制"
@@ -254,105 +141,7 @@ if ! resolve_clash_bin "$Install_Dir" "$CpuArch" >/dev/null 2>&1; then
 fi
 
 # =========================
-# fonction 工具函数区
-# =========================
-# 等待 config.yaml 出现并写入 secret（默认最多等 6 秒）
-wait_secret_ready() {
-  local conf_file="$1"
-  local timeout_sec="${2:-6}"
-
-  local end=$((SECONDS + timeout_sec))
-  while [ "$SECONDS" -lt "$end" ]; do
-    if [ -s "$conf_file" ] && grep -qE '^[[:space:]]*secret:' "$conf_file"; then
-      return 0
-    fi
-    sleep 0.2
-  done
-  return 1
-}
-
-# 计算字符串可视宽度：中文大概率按 2 宽处理（简单够用版）
-# 注：终端宽度/字体不统一时，中文宽度估算永远只能"近似"
-vis_width() {
-  python3 - <<'PY' "$1"
-import sys
-s=sys.argv[1]
-w=0
-for ch in s:
-  # East Asian Wide/FullWidth 近似当 2
-  w += 2 if ord(ch) >= 0x2E80 else 1
-print(w)
-PY
-}
-
-pad_right() { # pad_right "text" width
-  local s="$1" w="$2"
-  local cur
-  cur="$(vis_width "$s")"
-  local pad=$(( w - cur ))
-  (( pad < 0 )) && pad=0
-  printf "%s%*s" "$s" "$pad" ""
-}
-
-box_title() { # box_title "标题" width
-  local title="$1" width="$2"
-  local inner=$((width-2))
-  printf "┌%s┐\n" "$(printf '─%.0s' $(seq 1 $inner))"
-  # 标题居中（近似）
-  local t=" $title "
-  local tw; tw="$(vis_width "$t")"
-  local left=$(( (inner - tw)/2 )); ((left<0)) && left=0
-  local right=$(( inner - tw - left )); ((right<0)) && right=0
-  printf "│%*s%s%*s│\n" "$left" "" "$t" "$right" ""
-  printf "├%s┤\n" "$(printf '─%.0s' $(seq 1 $inner))"
-}
-
-box_row() { # box_row "key" "value" width keyw
-  local k="$1" v="$2" width="$3" keyw="$4"
-  local inner=$((width-2))
-  # 形如：│ key: value                      │
-  local left="$(pad_right "$k" "$keyw")"
-  local line=" ${left}  ${v}"
-  local lw; lw="$(vis_width "$line")"
-  local pad=$(( inner - lw )); ((pad<0)) && pad=0
-  printf "│%s%*s│\n" "$line" "$pad" ""
-}
-
-box_end() { # box_end width
-  local width="$1" inner=$((width-2))
-  printf "└%s┘\n" "$(printf '─%.0s' $(seq 1 $inner))"
-}
-
-# 从 config.yaml 提取 secret（强韧：支持缩进/引号/CRLF/尾空格）
-read_secret_from_config() {
-  local conf_file="$1"
-  [ -f "$conf_file" ] || return 1
-
-  # 1) 找到 secret 行 -> 2) 去掉 key 和空格 -> 3) 去掉首尾引号 -> 4) 去掉 CR
-  local s
-  s="$(
-    sed -nE 's/^[[:space:]]*secret:[[:space:]]*//p' "$conf_file" \
-      | head -n 1 \
-      | sed -E 's/^[[:space:]]*"(.*)"[[:space:]]*$/\1/; s/^[[:space:]]*'\''(.*)'\''[[:space:]]*$/\1/' \
-      | tr -d '\r'
-  )"
-
-  # 去掉纯空格
-  s="$(printf '%s' "$s" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
-
-  [ -n "$s" ] || return 1
-  printf '%s' "$s"
-}
-
-# 判断 systemd 是否可用（仅有 systemctl 命令但 PID 1 不是 systemd 时视为不可用）
-systemd_ready() {
-  command -v systemctl >/dev/null 2>&1 || return 1
-  systemctl show --property=Version --value >/dev/null 2>&1 || return 1
-  return 0
-}
-
-# =========================
-# systemd 安装与启动
+# systemd 安装
 # =========================
 Service_Enabled="unknown"
 Service_Started="unknown"
@@ -364,143 +153,69 @@ fi
 
 if [ "$Systemd_Usable" = "true" ]; then
   if [ "${CLASH_ENABLE_SERVICE:-true}" = "true" ] || [ "${CLASH_START_SERVICE:-true}" = "true" ]; then
-    CLASH_SERVICE_USER="$Service_User" CLASH_SERVICE_GROUP="$Service_Group" "$Install_Dir/scripts/cmd/systemd-setup.sh"
+    CLASH_SERVICE_USER="$Service_User" CLASH_SERVICE_GROUP="$Service_Group" \
+      "$Install_Dir/scripts/cmd/systemd-setup.sh"
 
-    if [ "${CLASH_ENABLE_SERVICE:-true}" = "true" ]; then
-      systemctl enable "${Service_Name}.service" >/dev/null 2>&1 || true
-    fi
-    if [ "${CLASH_START_SERVICE:-true}" = "true" ]; then
-      systemctl start "${Service_Name}.service" >/dev/null 2>&1 || true
-    fi
+    [ "${CLASH_ENABLE_SERVICE:-true}" = "true" ] && systemctl enable "${Service_Name}.service" >/dev/null 2>&1 || true
+    [ "${CLASH_START_SERVICE:-true}" = "true" ] && systemctl start "${Service_Name}.service" >/dev/null 2>&1 || true
 
-    if systemctl is-enabled --quiet "${Service_Name}.service" 2>/dev/null; then
-      Service_Enabled="enabled"
-    else
-      Service_Enabled="disabled"
-    fi
-
-    if systemctl is-active --quiet "${Service_Name}.service" 2>/dev/null; then
-      Service_Started="active"
-    else
-      Service_Started="inactive"
-    fi
+    Service_Enabled=$(systemctl is-enabled --quiet "${Service_Name}.service" 2>/dev/null && echo "enabled" || echo "disabled")
+    Service_Started=$(systemctl is-active --quiet "${Service_Name}.service" 2>/dev/null && echo "active" || echo "inactive")
   else
-    info "已按配置跳过 systemd 服务安装与启动（CLASH_ENABLE_SERVICE=false 且 CLASH_START_SERVICE=false）"
+    info "已按配置跳过 systemd 服务安装与启动"
     Service_Enabled="disabled"
     Service_Started="inactive"
   fi
 else
-  if command -v systemctl >/dev/null 2>&1; then
-    warn "检测到 systemctl 命令，但当前环境不可用 systemd（常见于 Docker 容器），已跳过服务单元生成"
-  else
+  command -v systemctl >/dev/null 2>&1 && \
+    warn "检测到 systemctl 但不可用（常见于 Docker 容器），已跳过服务单元生成" || \
     warn "未检测到 systemd，已跳过服务单元生成"
-  fi
 fi
 
 # =========================
 # Shell 代理快捷命令
-# 生成：/etc/profile.d/clash-for-linux.sh
 # =========================
-PROFILED_FILE="/etc/profile.d/clash-for-linux.sh"
-
-install_profiled() {
-  local http_port="${MIXED_PORT:-7890}"
-  # 兼容你后面可能支持 auto：auto 就先用 7890
-  [ "$http_port" = "auto" ] && http_port="7890"
-
-  # 只写 IPv4 loopback，避免某些环境 ::1 解析问题
-  tee "$PROFILED_FILE" >/dev/null <<EOF
-# Clash for Linux proxy helpers
-# Auto-generated by clash-for-linux installer.
-
-# Default proxy endpoint (HTTP)
-export CLASH_HTTP_PROXY="http://127.0.0.1:${http_port}"
-# Default proxy endpoint (SOCKS5)
-export CLASH_SOCKS_PROXY="socks5://127.0.0.1:${http_port}"
-
-proxy_on() {
-  export http_proxy="\$CLASH_HTTP_PROXY"
-  export https_proxy="\$CLASH_HTTP_PROXY"
-  export all_proxy="\$CLASH_SOCKS_PROXY"
-  export HTTP_PROXY="\$CLASH_HTTP_PROXY"
-  export HTTPS_PROXY="\$CLASH_HTTP_PROXY"
-  export ALL_PROXY="\$CLASH_SOCKS_PROXY"
-  echo "[OK] Proxy enabled: \$CLASH_HTTP_PROXY"
-}
-
-proxy_off() {
-  unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
-  echo "[OK] Proxy disabled"
-}
-
-proxy_status() {
-  echo "http_proxy=\${http_proxy:-<empty>}"
-  echo "https_proxy=\${https_proxy:-<empty>}"
-  echo "all_proxy=\${all_proxy:-<empty>}"
-}
-EOF
-
-  chmod 644 "$PROFILED_FILE"
-}
-
-install_profiled || true
+install_profiled "$Install_Dir" "$CLASH_HTTP_PORT" "$CLASH_SOCKS_PORT" || true
 
 # =========================
 # 安装 clashctl 命令
 # =========================
-if [ -f "$Install_Dir/clashctl" ]; then
-  install -m 0755 "$Install_Dir/clashctl" /usr/local/bin/clashctl
-fi
+[ -f "$Install_Dir/clashctl" ] && install -m 0755 "$Install_Dir/clashctl" /usr/local/bin/clashctl
 
 # =========================
-# 友好收尾输出（闭环）
+# 安装完成输出
 # =========================
-
 section "安装完成"
 ok "Clash for Linux 已安装至: $(path "${Install_Dir}")"
-
 log "📦 安装目录：$(path "${Install_Dir}")"
 log "👤 运行用户：${Service_User}:${Service_Group}"
 log "🔧 服务名称：${Service_Name}.service"
 
+# 服务状态
+section "服务状态"
 if [ "$Systemd_Usable" = "true" ]; then
-  section "服务状态"
-
-  se="${Service_Enabled:-unknown}"
-  ss="${Service_Started:-unknown}"
-
-  [[ "$se" == "enabled" ]] && se_colored="$(good "$se")" || se_colored="$(bad "$se")"
-  [[ "$ss" == "active"  ]] && ss_colored="$(good "$ss")" || ss_colored="$(bad "$ss")"
+  [[ "$Service_Enabled" == "enabled" ]] && se_colored="$(good "$Service_Enabled")" || se_colored="$(bad "$Service_Enabled")"
+  [[ "$Service_Started" == "active" ]] && ss_colored="$(good "$Service_Started")" || ss_colored="$(bad "$Service_Started")"
 
   log "🧷 开机自启：${se_colored}"
   log "🟢 服务状态：${ss_colored}"
-
   log ""
   log "${C_BOLD}常用命令：${C_NC}"
   log "  $(cmd "make status")"
   log "  $(cmd "sudo make restart")"
 else
-  section "服务状态"
-  warn "当前环境未启用 systemd（如 Docker 容器），请使用 clashctl 管理进程"
+  warn "当前环境未启用 systemd，请使用 clashctl 管理进程"
   log "  $(cmd "sudo clashctl start")"
   log "  $(cmd "sudo clashctl restart")"
 fi
 
-# =========================
-# Dashboard / Secret
-# =========================
+# Dashboard
 section "控制面板"
-
-api_port="$(parse_port "${EXTERNAL_CONTROLLER}")"
+api_port="${EXTERNAL_CONTROLLER##*:}"
 api_host="${EXTERNAL_CONTROLLER%:*}"
+[[ -z "$api_host" || "$api_host" == "$EXTERNAL_CONTROLLER" ]] && api_host="127.0.0.1"
 
-if [[ -z "$api_host" ]] || [[ "$api_host" == "$EXTERNAL_CONTROLLER" ]]; then
-  api_host="127.0.0.1"
-fi
-
-CONF_DIR="$Install_Dir/conf"
-CONF_FILE="$CONF_DIR/config.yaml"
-
+CONF_FILE="$Install_Dir/conf/config.yaml"
 SECRET_VAL=""
 if wait_secret_ready "$CONF_FILE" 6; then
   SECRET_VAL="$(read_secret_from_config "$CONF_FILE" || true)"
@@ -515,53 +230,35 @@ if [[ -n "$SECRET_VAL" ]]; then
   log "   查看完整 Secret：$(cmd "sudo sed -nE 's/^[[:space:]]*secret:[[:space:]]*//p' \"$CONF_FILE\" | head -n 1")"
 else
   log "🔐 Secret：${C_YELLOW}启动中暂未读到（稍后再试）${C_NC}"
-  log "   稍后查看：$(cmd "sudo sed -nE 's/^[[:space:]]*secret:[[:space:]]*//p' \"$CONF_FILE\" | head -n 1")"
 fi
 
-# =========================
-# 订阅配置（必须）
-# =========================
+# 订阅状态
 section "订阅状态"
-
-ENV_FILE="${Install_Dir}/.env"
-
 if [[ -n "${CLASH_URL:-}" ]]; then
   ok "订阅地址已配置（CLASH_URL 已写入 .env）"
 else
   warn "订阅地址未配置（必须）"
   log ""
   log "配置订阅地址："
-  log "  $(cmd "sudo bash -c 'echo \"CLASH_URL=<订阅地址>\" > ${ENV_FILE}'")"
+  log "  $(cmd "sudo bash -c 'echo \"CLASH_URL=<订阅地址>\" >> ${Install_Dir}/.env'")"
   log ""
   log "配置完成后重启服务："
-  if [ "$Systemd_Usable" = "true" ]; then
-    log "  $(cmd "sudo make restart")"
-  else
-    log "  $(cmd "sudo clashctl restart")"
-  fi
+  [ "$Systemd_Usable" = "true" ] && log "  $(cmd "sudo make restart")" || log "  $(cmd "sudo clashctl restart")"
 fi
 
-# =========================
 # 下一步
-# =========================
-section "下一步开启代理（可选）"
-
+section "下一步（可选）"
 PROFILED_FILE="/etc/profile.d/clash-for-linux.sh"
-
 if [ -f "$PROFILED_FILE" ]; then
+  log "开启终端代理："
   log "  $(cmd "source $PROFILED_FILE")"
   log "  $(cmd "proxy_on")"
-else
-  log "  （未安装 Shell 代理快捷命令，跳过）"
 fi
 
-# =========================
-# 启动后快速诊断
-# =========================
+# 启动诊断
 sleep 1
 if [ "$Systemd_Usable" = "true" ] && command -v journalctl >/dev/null 2>&1; then
-  if journalctl -u "${Service_Name}.service" -n 50 --no-pager 2>/dev/null \
-     | grep -q "Clash订阅地址不可访问"; then
-    warn "服务启动异常：订阅不可用，请检查 CLASH_URL（可能过期 / 404 / 被墙）。"
+  if journalctl -u "${Service_Name}.service" -n 50 --no-pager 2>/dev/null | grep -q "Clash订阅地址不可访问"; then
+    warn "服务启动异常：订阅不可用，请检查 CLASH_URL"
   fi
 fi
