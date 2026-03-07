@@ -18,10 +18,12 @@ resolve_clash_home() {
 			return 0
 		fi
 	fi
+	# 优先脚本所在目录（支持源码即安装目录）
 	if [ -f "$SCRIPT_DIR/.env" ]; then
 		echo "$SCRIPT_DIR"
 		return 0
 	fi
+	# 回退到标准安装目录（兼容旧安装）
 	if [ -f "/opt/clash-for-linux/.env" ]; then
 		echo "/opt/clash-for-linux"
 		return 0

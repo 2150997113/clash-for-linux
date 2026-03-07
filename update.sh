@@ -13,11 +13,11 @@ if [ -n "${CLASH_ENV:-}" ]; then
   ENV_FILE_CANDIDATES+=("$CLASH_ENV")
 fi
 
-# 2) 默认优先安装目录（systemd 实际运行目录）
-ENV_FILE_CANDIDATES+=("/opt/clash-for-linux/.env")
-
-# 3) 回退到脚本目录（仓库本地调试）
+# 2) 优先脚本所在目录（支持源码即安装目录）
 ENV_FILE_CANDIDATES+=("$Server_Dir/.env")
+
+# 3) 回退到标准安装目录（兼容旧安装）
+ENV_FILE_CANDIDATES+=("/opt/clash-for-linux/.env")
 
 ENV_FILE=""
 for f in "${ENV_FILE_CANDIDATES[@]}"; do
