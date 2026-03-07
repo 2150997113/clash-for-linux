@@ -139,3 +139,50 @@ box_end() {
   local width="${1:-50}" inner=$((width-2))
   printf "└%s┘\n" "$(printf '─%.0s' $(seq 1 $inner))"
 }
+
+# =========================
+# Action 输出（用于 systemd 兼容）
+# =========================
+action_success() {
+  echo -en "\033[60G[\033[1;32m OK \033[0;39m]\r"
+  return 0
+}
+
+action_failure() {
+  local rc=$?
+  echo -en "\033[60G[\033[1;31mFAILED\033[0;39m]\r"
+  [ -x /bin/plymouth ] && /bin/plymouth --details 2>/dev/null || true
+  return "$rc"
+}
+
+action() {
+  local STRING="$1"
+  shift
+  if "$@"; then
+    action_success || true
+    return 0
+  else
+    action_failure || true
+    return 1
+  fi
+}
+
+# 判断命令是否正常执行
+# - 手动模式：失败直接 exit
+# - systemd 模式：只打印状态，不影响退出码
+if_success() {
+  local ok_msg="$1" fail_msg="$2" rc="$3"
+
+  if [ "$rc" -eq 0 ]; then
+    action "$ok_msg" /bin/true 2>/dev/null || true
+    return 0
+  fi
+
+  action "$fail_msg" /bin/false 2>/dev/null || true
+
+  if [ "${SYSTEMD_MODE:-false}" = "true" ]; then
+    return "$rc"
+  else
+    exit "$rc"
+  fi
+}
