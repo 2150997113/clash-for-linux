@@ -288,6 +288,95 @@ rules:
   - MATCH,personal
 ```
 
+## SSH 代理配置
+
+SSH 协议不走 HTTP 代理，需要通过 `ProxyCommand` 配置 SOCKS5 代理。
+
+### 安装依赖
+
+```bash
+# Ubuntu/Debian
+apt-get install -y connect-proxy
+
+# CentOS/RHEL
+yum install -y connect-proxy
+```
+
+### SSH Config 配置
+
+编辑 `~/.ssh/config`，为特定主机配置代理：
+
+```
+# 公司内网 GitLab（走代理）
+Host gitlab.company.com
+    HostName gitlab.company.com
+    User git
+    Port 2222
+    ProxyCommand connect -S 127.0.0.1:7890 %h %p
+
+# 公司内网服务器（走代理）
+Host jump.company.com
+    HostName 10.200.1.100
+    User username
+    ProxyCommand connect -S 127.0.0.1:7890 %h %p
+
+# 普通服务器（直连）
+Host github.com
+    HostName github.com
+    User git
+```
+
+### 配置说明
+
+| 参数 | 说明 |
+|-----|------|
+| `-S 127.0.0.1:7890` | SOCKS5 代理地址（Clash mixed-port） |
+| `%h` | 目标主机名 |
+| `%p` | 目标端口 |
+
+### 使用方式
+
+配置后可直接使用别名连接：
+
+```bash
+# 直接连接，自动走代理
+ssh jump.company.com
+
+# Git 克隆也生效
+git clone ssh://gitlab.company.com:2222/group/project.git
+```
+
+### 临时使用代理
+
+不修改配置文件，临时指定代理：
+
+```bash
+# SSH 连接
+ssh -o ProxyCommand="connect -S 127.0.0.1:7890 %h %p" user@10.200.1.100
+
+# Git 克隆
+GIT_SSH_COMMAND="ssh -o ProxyCommand='connect -S 127.0.0.1:7890 %h %p'" \
+    git clone ssh://git@10.200.1.100:2222/project.git
+```
+
+### 多代理配置
+
+根据目标主机选择不同代理：
+
+```
+# 公司内网 - 走公司代理
+Host 10.200.*
+    ProxyCommand connect -S 127.0.0.1:7890 %h %p
+
+# 国外服务器 - 走翻墙代理
+Host *.amazonaws.com
+    ProxyCommand connect -S 127.0.0.1:7890 %h %p
+
+# 国内服务器 - 直连
+Host *.aliyun.com
+    # 无 ProxyCommand，直连
+```
+
 ## 调试
 
 查看当前生效的规则：
@@ -330,3 +419,4 @@ just status
 # 重启服务
 just restart
 ```
+
