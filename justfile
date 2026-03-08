@@ -54,7 +54,7 @@ status:
         echo "[OK] 代理已开启: ${http_proxy:-${HTTP_PROXY:-}}"
     else
         echo "[OFF] 代理未开启"
-        echo "      执行 'just up' 开启代理"
+        echo "      执行 'proxy_on' 开启代理"
     fi
 
 # 查看日志
@@ -67,16 +67,6 @@ test:
     source /etc/profile.d/clash-for-linux.sh && proxy_on && \
     curl -s --max-time 5 https://www.google.com -o /dev/null && \
     echo "[OK] Google 可访问" || echo "[FAIL] 代理不可用"
-
-# ==================== 代理控制 ====================
-
-# 启用代理（等效于 proxy_on）
-up:
-    @bash -c 'source /etc/profile.d/clash-for-linux.sh && proxy_on'
-
-# 关闭代理（等效于 proxy_down）
-down:
-    @bash -c 'source /etc/profile.d/clash-for-linux.sh && proxy_down'
 
 # ==================== 订阅管理 ====================
 
