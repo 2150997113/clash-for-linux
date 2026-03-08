@@ -92,16 +92,23 @@ section() {
 # 盒子输出（用于关键信息展示）
 # =========================
 
-# 计算字符串可视宽度（中文按 2 宽处理）
+# 剥离 ANSI 转义序列（用于计算可视宽度）
+strip_ansi() {
+  printf '%s' "$1" | sed 's/\x1b\[[0-9;]*m//g'
+}
+
+# 计算字符串可视宽度（中文按 2 宽处理，忽略 ANSI 转义）
 vis_width() {
-  python3 - <<'PY' "$1"
+  local s
+  s="$(strip_ansi "$1")"
+  printf '%s' "$s" | python3 -c '
 import sys
-s=sys.argv[1]
-w=0
+s = sys.stdin.read()
+w = 0
 for ch in s:
   w += 2 if ord(ch) >= 0x2E80 else 1
 print(w)
-PY
+'
 }
 
 pad_right() {
@@ -113,22 +120,56 @@ pad_right() {
   printf "%s%*s" "$s" "$pad" ""
 }
 
+# 生成指定数量的横线
+_make_dashes() {
+  local _n="$1"
+  local _dashes=""
+  local _i
+  for ((_i=0; _i<_n; _i++)); do
+    _dashes="${_dashes}─"
+  done
+  printf '%s' "$_dashes"
+}
+
 box_title() {
-  local title="$1" width="${2:-50}"
+  local title="$1"
+  local width="${2:-50}"
   local inner=$((width-2))
-  printf "┌%s┐\n" "$(printf '─%.0s' $(seq 1 $inner))"
+  printf "┌%s┐\n" "$(_make_dashes "$inner")"
   local t=" $title "
   local tw; tw="$(vis_width "$t")"
   local left=$(( (inner - tw)/2 )); ((left<0)) && left=0
   local right=$(( inner - tw - left )); ((right<0)) && right=0
   printf "│%*s%s%*s│\n" "$left" "" "$t" "$right" ""
-  printf "├%s┤\n" "$(printf '─%.0s' $(seq 1 $inner))"
+  printf "├%s┤\n" "$(_make_dashes "$inner")"
 }
 
 box_row() {
-  local k="$1" v="$2" width="${3:-50}" keyw="${4:-12}"
+  local k="$1"
+  local v="$2"
+  local width="${3:-50}"
+  local keyw="${4:-12}"
   local inner=$((width-2))
   local left="$(pad_right "$k" "$keyw")"
+
+  # 计算值可用的最大宽度：总宽度 - 2(边框) - keyw - 4(空格和分隔)
+  local max_valw=$(( inner - keyw - 4 ))
+  (( max_valw < 10 )) && max_valw=10
+
+  # 获取值的可视内容（无颜色）
+  local v_stripped
+  v_stripped="$(strip_ansi "$v")"
+
+  # 如果值过长，截断并添加 ...
+  if [ "$(vis_width "$v_stripped")" -gt "$max_valw" ]; then
+    # 逐步截断直到合适
+    local truncated="$v_stripped"
+    while [ "$(vis_width "$truncated")" -gt $((max_valw - 3)) ] && [ -n "$truncated" ]; do
+      truncated="${truncated%?}"
+    done
+    v="${truncated}..."
+  fi
+
   local line=" ${left}  ${v}"
   local lw; lw="$(vis_width "$line")"
   local pad=$(( inner - lw )); ((pad<0)) && pad=0
@@ -136,8 +177,9 @@ box_row() {
 }
 
 box_end() {
-  local width="${1:-50}" inner=$((width-2))
-  printf "└%s┘\n" "$(printf '─%.0s' $(seq 1 $inner))"
+  local width="${1:-50}"
+  local inner=$((width-2))
+  printf "└%s┘\n" "$(_make_dashes "$inner")"
 }
 
 # =========================

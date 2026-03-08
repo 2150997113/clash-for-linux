@@ -52,8 +52,16 @@ fi
 source "$INSTALL_DIR/.env"
 
 # =========================
+# 安装进度提示
+# =========================
+log ""
+log "${C_BOLD}▶ 开始安装 clash-for-linux${C_NC}"
+log "${C_GRAY}────────────────────────────────────────${C_NC}"
+
+# =========================
 # 设置权限
 # =========================
+info "设置脚本执行权限..."
 chmod +x "$INSTALL_DIR/scripts/cmd/"*.sh 2>/dev/null || true
 chmod +x "$INSTALL_DIR/scripts/lib/"*.sh 2>/dev/null || true
 chmod +x "$INSTALL_DIR/libs/clash/"* 2>/dev/null || true
@@ -63,6 +71,7 @@ chmod +x "$INSTALL_DIR/clashctl" 2>/dev/null || true
 # =========================
 # CPU 架构检测
 # =========================
+info "检测 CPU 架构..."
 if [[ -z "${CPU_ARCH:-}" ]]; then
   get_cpu_arch
 fi
@@ -71,7 +80,7 @@ if [[ -z "${CPU_ARCH:-}" ]]; then
   err "无法识别 CPU 架构"
   exit 1
 fi
-info "CPU architecture: ${CPU_ARCH}"
+ok "CPU 架构: ${CPU_ARCH}"
 
 # =========================
 # 交互式填写订阅地址
@@ -115,6 +124,7 @@ prompt_clash_url
 # =========================
 # 端口冲突检测
 # =========================
+info "检查端口占用..."
 CLASH_HTTP_PORT="${CLASH_HTTP_PORT:-7890}"
 CLASH_SOCKS_PORT="${CLASH_SOCKS_PORT:-7891}"
 CLASH_REDIR_PORT="${CLASH_REDIR_PORT:-7892}"
@@ -127,7 +137,7 @@ for port in "$CLASH_HTTP_PORT" "$CLASH_SOCKS_PORT" "$CLASH_REDIR_PORT" "${EXTERN
 done
 
 if [ "${#Port_Conflicts[@]}" -ne 0 ]; then
-  warn "检测到端口冲突: ${Port_Conflicts[*]}，运行时将自动分配可用端口"
+  warn "端口冲突: ${Port_Conflicts[*]}（运行时自动分配）"
 fi
 
 install -d -m 0755 "$INSTALL_DIR/conf" "$INSTALL_DIR/logs" "$INSTALL_DIR/temp"
@@ -135,14 +145,17 @@ install -d -m 0755 "$INSTALL_DIR/conf" "$INSTALL_DIR/logs" "$INSTALL_DIR/temp"
 # =========================
 # Clash 内核检查
 # =========================
+info "检查 Clash 内核..."
 if ! resolve_clash_bin "$INSTALL_DIR" "$CPU_ARCH" >/dev/null 2>&1; then
   err "Clash 内核未就绪，请检查下载配置或手动放置二进制"
   exit 1
 fi
+ok "Clash 内核就绪"
 
 # =========================
 # systemd 安装
 # =========================
+info "配置 systemd 服务..."
 Service_Enabled="unknown"
 Service_Started="unknown"
 Systemd_Usable="false"
@@ -161,6 +174,7 @@ if [ "$Systemd_Usable" = "true" ]; then
 
     Service_Enabled=$(systemctl is-enabled --quiet "${SERVICE_NAME}.service" 2>/dev/null && echo "enabled" || echo "disabled")
     Service_Started=$(systemctl is-active --quiet "${SERVICE_NAME}.service" 2>/dev/null && echo "active" || echo "inactive")
+    ok "systemd 服务已配置"
   else
     info "已按配置跳过 systemd 服务安装与启动"
     Service_Enabled="disabled"
@@ -168,14 +182,16 @@ if [ "$Systemd_Usable" = "true" ]; then
   fi
 else
   command -v systemctl >/dev/null 2>&1 && \
-    warn "检测到 systemctl 但不可用（常见于 Docker 容器），已跳过服务单元生成" || \
-    warn "未检测到 systemd，已跳过服务单元生成"
+    warn "systemctl 不可用（Docker？），跳过服务配置" || \
+    info "无 systemd，使用 clashctl 管理进程"
 fi
 
 # =========================
 # Shell 代理快捷命令
 # =========================
+info "安装代理快捷命令..."
 install_profiled "$INSTALL_DIR" "$CLASH_HTTP_PORT" "$CLASH_SOCKS_PORT" || true
+ok "已安装 proxy_on / proxy_down"
 
 # =========================
 # 安装 clashctl 和 m 命令
@@ -186,76 +202,81 @@ install_profiled "$INSTALL_DIR" "$CLASH_HTTP_PORT" "$CLASH_SOCKS_PORT" || true
 # =========================
 # 安装完成输出
 # =========================
-section "安装完成"
-log "📦 安装目录：$(path "${INSTALL_DIR}")"
-log "👤 运行用户：${SERVICE_USER}:${SERVICE_GROUP}"
-log "🔧 服务名称：${SERVICE_NAME}.service"
+# 使用紧凑格式输出安装结果
+box_title "clash-for-linux 安装完成" 52
+box_row "安装目录" "${INSTALL_DIR}" 52 10
+box_row "运行用户" "${SERVICE_USER}:${SERVICE_GROUP}" 52 10
+box_row "服务名称" "${SERVICE_NAME}.service" 52 10
 
 # 服务状态
-section "服务状态"
 if [ "$Systemd_Usable" = "true" ]; then
   [[ "$Service_Enabled" == "enabled" ]] && se_colored="$(good "$Service_Enabled")" || se_colored="$(bad "$Service_Enabled")"
   [[ "$Service_Started" == "active" ]] && ss_colored="$(good "$Service_Started")" || ss_colored="$(bad "$Service_Started")"
-
-  log "🧷 开机自启：${se_colored}"
-  log "🟢 服务状态：${ss_colored}"
-  log ""
-  log "${C_BOLD}常用命令：${C_NC}"
-  log "  $(cmd "just status")"
-  log "  $(cmd "sudo just restart")"
+  box_row "开机自启" "${se_colored}" 52 10
+  box_row "服务状态" "${ss_colored}" 52 10
 else
-  warn "当前环境未启用 systemd，请使用 clashctl 管理进程"
-  log "  $(cmd "sudo clashctl start")"
-  log "  $(cmd "sudo clashctl restart")"
+  box_row "服务管理" "clashctl (无 systemd)" 52 10
 fi
 
-# External Controller
-section "控制接口"
+# API 信息
 api_port="${EXTERNAL_CONTROLLER##*:}"
 api_host="${EXTERNAL_CONTROLLER%:*}"
 [[ -z "$api_host" || "$api_host" == "$EXTERNAL_CONTROLLER" ]] && api_host="127.0.0.1"
-
 CONF_FILE="$INSTALL_DIR/conf/config.yaml"
 SECRET_VAL=""
 if wait_secret_ready "$CONF_FILE" 6; then
   SECRET_VAL="$(read_secret_from_config "$CONF_FILE" || true)"
 fi
-
-api_url="http://${api_host}:${api_port}"
-log "🌐 API：$(url "$api_url")"
-
+box_row "API" "http://${api_host}:${api_port}" 52 10
 if [[ -n "$SECRET_VAL" ]]; then
-  log "🔐 SECRET：${C_YELLOW}${SECRET_VAL}${C_NC}"
+  # SECRET 过长时截断（先截断再加颜色）
+  if [ ${#SECRET_VAL} -gt 32 ]; then
+    SECRET_VAL="${SECRET_VAL:0:16}...${SECRET_VAL: -8}"
+  fi
+  box_row "SECRET" "${SECRET_VAL}" 52 10
 else
-  log "🔐 SECRET：${C_YELLOW}启动中暂未读到（稍后再试）${C_NC}"
+  box_row "SECRET" "启动中..." 52 10
 fi
 
 # 订阅状态
-section "订阅状态"
 if [[ -n "${CLASH_URL:-}" ]]; then
-  ok "订阅地址已配置（CLASH_URL 已写入 .env）"
+  box_row "订阅" "已配置" 52 10
 else
-  warn "订阅地址未配置（必须）"
-  log ""
-  log "配置订阅地址："
-  log "  $(cmd "sudo bash -c 'echo \"CLASH_URL=<订阅地址>\" >> ${INSTALL_DIR}/.env'")"
-  log ""
-  log "配置完成后重启服务："
-  [ "$Systemd_Usable" = "true" ] && log "  $(cmd "sudo just restart")" || log "  $(cmd "sudo clashctl restart")"
+  box_row "订阅" "未配置" 52 10
 fi
 
-# 下一步
-section "下一步（可选）"
+box_end 52
+
+# 操作提示
+log ""
+log "${C_BOLD}常用命令：${C_NC}"
+if [ "$Systemd_Usable" = "true" ]; then
+  log "  $(cmd "just status")   # 查看状态"
+  log "  $(cmd "sudo just restart")   # 重启服务"
+else
+  log "  $(cmd "sudo clashctl status")   # 查看状态"
+  log "  $(cmd "sudo clashctl restart")   # 重启服务"
+fi
+
+# 未配置订阅提示
+if [[ -z "${CLASH_URL:-}" ]]; then
+  log ""
+  warn "请配置订阅地址后重启服务："
+  log "  $(cmd "sudo bash -c 'echo \"CLASH_URL=<订阅地址>\" >> ${INSTALL_DIR}/.env'")"
+fi
+
+# 开启代理提示
 PROFILED_FILE="/etc/profile.d/clash-for-linux.sh"
 if [ -f "$PROFILED_FILE" ]; then
-  log "开启终端代理："
-  log "  $(cmd "source $PROFILED_FILE && proxy_on")"
+  log ""
+  log "本 shell 复制执行：$(cmd "source $PROFILED_FILE && proxy_on")"
 fi
 
 # 启动诊断
 sleep 1
 if [ "$Systemd_Usable" = "true" ] && command -v journalctl >/dev/null 2>&1; then
   if journalctl -u "${SERVICE_NAME}.service" -n 50 --no-pager 2>/dev/null | grep -q "Clash订阅地址不可访问"; then
+    log ""
     warn "服务启动异常：订阅不可用，请检查 CLASH_URL"
   fi
 fi
