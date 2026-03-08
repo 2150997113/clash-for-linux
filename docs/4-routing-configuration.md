@@ -1,41 +1,31 @@
 # 分流配置指南
 
-本文档介绍如何配置多订阅分流策略，实现特定流量走指定代理。
+实现特定流量走指定代理，如公司内网走公司代理、其他流量走个人订阅。
 
-## 使用场景
+## 快速配置
 
-- 访问公司内网（如 GitLab）走公司代理
-- 其他流量走个人订阅
-- 无需手动切换，自动路由
+### 1. 环境变量
 
-## 快速开始
-
-### 1. 配置环境变量
-
-编辑 `.env` 文件，添加 work 代理配置：
+编辑 `.env`：
 
 ```bash
-# Work 代理配置
 export WORK_PROXY_HOST='代理服务器地址'
 export WORK_PROXY_PORT='代理端口'
 export WORK_PROXY_USER='用户名'
 export WORK_PROXY_PASS='密码'
 ```
 
-### 2. 创建分流配置文件
+### 2. 分流配置
 
 创建 `conf/routing-config.yaml`：
 
 ```yaml
-# 分流配置示例
-
 port: 7890
 socks-port: 7891
 mixed-port: 7892
 allow-lan: false
 mode: rule
 log-level: info
-external-controller: 127.0.0.1:9090
 
 dns:
   enable: true
@@ -58,10 +48,6 @@ proxy-providers:
     url: https://your-subscription-url&flag=clash
     interval: 3600
     path: ./proxy-providers/personal.yaml
-    health-check:
-      enable: true
-      interval: 600
-      url: http://www.gstatic.com/generate_204
 
 proxy-groups:
   - name: work
@@ -75,88 +61,40 @@ proxy-groups:
       - personal
 
 rules:
-  # 公司内网 IP 段
   - IP-CIDR,10.200.0.0/16,work
-  # 公司域名
   - DOMAIN-SUFFIX,company.com,work
-  # 其他流量
   - MATCH,personal
 ```
 
-### 3. 添加为本地订阅
+### 3. 添加订阅
 
 ```bash
 just add routing local:/path/to/routing-config.yaml
-```
-
-### 4. 切换到分流配置
-
-```bash
 just use routing
 ```
 
-切换时会自动：
-- 替换环境变量（如 `${WORK_PROXY_HOST}`）
-- 重启服务使配置生效
+---
 
 ## 规则类型
 
 ### IP-CIDR
 
-匹配 IP 地址或 IP 段：
-
 ```yaml
 rules:
-  # 单个 IP
-  - IP-CIDR,192.168.1.100/32,work
-  # IP 段
-  - IP-CIDR,10.0.0.0/8,work
-  - IP-CIDR,172.16.0.0/12,work
-  - IP-CIDR,192.168.0.0/16,work
-```
-
-### DOMAIN-SUFFIX
-
-匹配域名后缀：
-
-```yaml
-rules:
-  - DOMAIN-SUFFIX,google.com,personal
-  - DOMAIN-SUFFIX,github.com,personal
-  - DOMAIN-SUFFIX,company.internal,work
+  - IP-CIDR,192.168.1.100/32,work    # 单个 IP
+  - IP-CIDR,10.0.0.0/8,work          # IP 段
 ```
 
 ### DOMAIN
 
-精确匹配域名：
-
 ```yaml
 rules:
-  - DOMAIN,gitlab.company.com,work
-```
-
-### SRC-IP-CIDR
-
-匹配来源 IP（客户端 IP）：
-
-```yaml
-rules:
-  - SRC-IP-CIDR,192.168.1.0/24,direct
-```
-
-### PROCESS-NAME
-
-匹配进程名：
-
-```yaml
-rules:
-  - PROCESS-NAME,ssh,direct
-  - PROCESS-NAME,curl,personal
+  - DOMAIN,gitlab.company.com,work       # 精确匹配
+  - DOMAIN-SUFFIX,company.com,work       # 后缀匹配
+  - DOMAIN-KEYWORD,analytics,REJECT      # 关键字
 ```
 
 ### GEOIP
-
-匹配地理位置：
 
 ```yaml
 rules:
@@ -166,257 +104,96 @@ rules:
 
 ### 最终规则
 
-`MATCH` 必须放在最后，匹配所有未匹配的流量：
+`MATCH` 必须放最后：
 
 ```yaml
 rules:
   - MATCH,personal
 ```
 
+---
+
 ## 代理组类型
 
-### select
-
-手动选择：
-
-```yaml
-proxy-groups:
-  - name: my-group
-    type: select
-    proxies:
-      - node-1
-      - node-2
-```
-
-### url-test
-
-自动选择延迟最低的节点：
+| 类型 | 说明 |
+|------|------|
+| `select` | 手动选择 |
+| `url-test` | 自动选最低延迟 |
+| `fallback` | 按顺序尝试 |
+| `load-balance` | 负载均衡 |
 
 ```yaml
 proxy-groups:
   - name: auto
     type: url-test
-    proxies:
-      - node-1
-      - node-2
+    use:
+      - personal
     url: http://www.gstatic.com/generate_204
     interval: 300
 ```
 
-### fallback
-
-按顺序尝试，第一个可用则使用：
-
-```yaml
-proxy-groups:
-  - name: backup
-    type: fallback
-    proxies:
-      - node-1
-      - node-2
-    url: http://www.gstatic.com/generate_204
-    interval: 300
-```
-
-### load-balance
-
-负载均衡：
-
-```yaml
-proxy-groups:
-  - name: balance
-    type: load-balance
-    strategy: consistent-hashing
-    proxies:
-      - node-1
-      - node-2
-    url: http://www.gstatic.com/generate_204
-    interval: 300
-```
-
-## 环境变量
-
-在配置文件中使用 `${VAR_NAME}` 语法引用环境变量：
-
-```yaml
-proxies:
-  - name: work-proxy
-    type: socks5
-    server: ${WORK_PROXY_HOST}
-    port: ${WORK_PROXY_PORT}
-    username: ${WORK_PROXY_USER}
-    password: ${WORK_PROXY_PASS}
-```
-
-切换订阅时会自动替换。
-
-## 常见配置示例
-
-### 公司内网分流
-
-```yaml
-rules:
-  # 公司内网 IP
-  - IP-CIDR,10.0.0.0/8,work
-  - IP-CIDR,172.16.0.0/12,work
-  - IP-CIDR,192.168.0.0/16,work
-  # 公司域名
-  - DOMAIN-SUFFIX,internal.company.com,work
-  - DOMAIN-SUFFIX,gitlab.company.com,work
-  # 其他
-  - MATCH,personal
-```
-
-### 国内直连
-
-```yaml
-rules:
-  # 国内直连
-  - GEOIP,CN,direct
-  # 其他走代理
-  - MATCH,personal
-```
-
-### 广告拦截
-
-```yaml
-rules:
-  # 广告域名
-  - DOMAIN-SUFFIX,ad.com,REJECT
-  - DOMAIN-KEYWORD,analytics,REJECT
-  # 其他
-  - MATCH,personal
-```
+---
 
 ## SSH 代理配置
 
-SSH 协议不走 HTTP 代理，需要通过 `ProxyCommand` 配置 SOCKS5 代理。
+SSH 不走 HTTP 代理，需配置 SOCKS5。
 
 ### 安装依赖
 
 ```bash
-# Ubuntu/Debian
-apt-get install -y connect-proxy
-
-# CentOS/RHEL
-yum install -y connect-proxy
+apt-get install -y connect-proxy  # Debian/Ubuntu
+yum install -y connect-proxy      # CentOS/RHEL
 ```
 
-### SSH Config 配置
+### SSH Config
 
-编辑 `~/.ssh/config`，为特定主机配置代理：
+编辑 `~/.ssh/config`：
 
 ```
-# 公司内网 GitLab（走代理）
+# 公司内网（走代理）
 Host gitlab.company.com
     HostName gitlab.company.com
     User git
-    Port 2222
     ProxyCommand connect -S 127.0.0.1:7890 %h %p
 
-# 公司内网服务器（走代理）
-Host jump.company.com
-    HostName 10.200.1.100
-    User username
-    ProxyCommand connect -S 127.0.0.1:7890 %h %p
-
-# 普通服务器（直连）
+# 直连
 Host github.com
     HostName github.com
     User git
 ```
 
-### 配置说明
+### 参数说明
 
 | 参数 | 说明 |
-|-----|------|
-| `-S 127.0.0.1:7890` | SOCKS5 代理地址（Clash mixed-port） |
-| `%h` | 目标主机名 |
+|------|------|
+| `-S 127.0.0.1:7890` | SOCKS5 代理地址 |
+| `%h` | 目标主机 |
 | `%p` | 目标端口 |
 
-### 使用方式
-
-配置后可直接使用别名连接：
+### 临时使用
 
 ```bash
-# 直接连接，自动走代理
-ssh jump.company.com
-
-# Git 克隆也生效
-git clone ssh://gitlab.company.com:2222/group/project.git
-```
-
-### 临时使用代理
-
-不修改配置文件，临时指定代理：
-
-```bash
-# SSH 连接
 ssh -o ProxyCommand="connect -S 127.0.0.1:7890 %h %p" user@10.200.1.100
-
-# Git 克隆
-GIT_SSH_COMMAND="ssh -o ProxyCommand='connect -S 127.0.0.1:7890 %h %p'" \
-    git clone ssh://git@10.200.1.100:2222/project.git
 ```
 
-### 多代理配置
-
-根据目标主机选择不同代理：
-
-```
-# 公司内网 - 走公司代理
-Host 10.200.*
-    ProxyCommand connect -S 127.0.0.1:7890 %h %p
-
-# 国外服务器 - 走翻墙代理
-Host *.amazonaws.com
-    ProxyCommand connect -S 127.0.0.1:7890 %h %p
-
-# 国内服务器 - 直连
-Host *.aliyun.com
-    # 无 ProxyCommand，直连
-```
+---
 
 ## 调试
 
-查看当前生效的规则：
-
 ```bash
-# 查看配置文件中的规则
+# 查看规则
 grep -A 20 "^rules:" conf/config.yaml
 
-# 通过 API 查看规则
-curl -s http://127.0.0.1:9090/rules -H "Authorization: Bearer $(grep secret conf/config.yaml | awk '{print $2}')"
-```
-
-测试特定域名的路由：
-
-```bash
-# 测试域名匹配
-curl -s "http://127.0.0.1:9090/providers/proxies/personal" \
+# API 查询
+curl -s http://127.0.0.1:9090/rules \
   -H "Authorization: Bearer <secret>"
 ```
 
+---
+
 ## 注意事项
 
-1. **规则顺序**：从上到下匹配，第一个匹配的规则生效
-2. **MATCH 规则**：必须放在最后
-3. **敏感信息**：使用环境变量，不要硬编码密码
-4. **配置文件**：不要提交到 git（已在 `.gitignore` 中排除）
-
-## 相关命令
-
-```bash
-# 列出订阅
-just list
-
-# 切换订阅
-just use <name>
-
-# 查看状态
-just status
-
-# 重启服务
-just restart
-```
-
+1. 规则从上到下匹配，第一个匹配生效
+2. `MATCH` 必须放最后
+3. 敏感信息用环境变量，不要硬编码
+4. 配置文件不要提交 git（已在 `.gitignore`）
