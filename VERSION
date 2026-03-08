@@ -1,11 +1,27 @@
-# 20260308
-## 功能
-- 多订阅管理 (clashctl sub add/list/use/del)
+clash-for-linux 2.0.0 (2026-03-08)
+
+## 新功能
+- 多订阅管理 (clashctl sub add/list/use/del/update)
 - 本地配置文件支持 (local:./config.yaml)
-- systemd 服务管理 (start/stop/restart/status)
+- systemd 服务集成 (start/stop/restart/status)
 - 系统代理开关 (proxy_on/proxy_down)
-- Mixin 配置覆盖
+- Mixin 配置覆盖 (conf/mixin.d/*.yaml)
 - Tun 模式支持
 - 多架构支持 (amd64/arm64/armv7)
-## 协议
+
+## 改进
+- 安装输出优化，显示进度步骤和边框格式
+- 订阅切换体验优化，增加确认提示
+- 文档重构整理，按功能分类
+
+## 修复
+- 修复订阅不存在时错误提示不显示的问题
+- 修复 subconverter target 配置
+- 订阅已存在时增加覆盖确认提示 (Y/N)
+
+## 变更
+- 移除内置 Dashboard，不再提供网页管理界面
+- 通过 REST API 或第三方客户端管理
+
+## 协议支持
 VMess / VLESS / SS / SSR / Trojan / Hysteria / TUIC / HTTP / SOCKS5
