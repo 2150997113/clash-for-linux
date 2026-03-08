@@ -134,8 +134,26 @@ subscription_add() {
 	fi
 	ensure_subscription_file
 	if subscription_lookup "$name" >/dev/null; then
-		echo "[ERROR] 订阅已存在: $name" >&2
-		exit 1
+		echo "[WARN] 订阅已存在: $name"
+		local confirm
+		while true; do
+			read -r -p "是否覆盖? [Y/N]: " confirm
+			case "$confirm" in
+				[Yy])
+					# 删除旧记录
+					awk -F'|' -v target="$name" '$1 != target' "$SUBSCRIPTION_FILE" > "${SUBSCRIPTION_FILE}.tmp"
+					mv "${SUBSCRIPTION_FILE}.tmp" "$SUBSCRIPTION_FILE"
+					break
+					;;
+				[Nn])
+					echo "[INFO] 已取消"
+					exit 0
+					;;
+				*)
+					echo "[WARN] 请输入 Y 或 N"
+					;;
+			esac
+		done
 	fi
 	printf "%s|%s|%s|-\n" "$name" "$url" "$headers" >> "$SUBSCRIPTION_FILE"
 	echo "[OK] 已添加订阅: $name"
