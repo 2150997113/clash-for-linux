@@ -236,6 +236,11 @@ When `clashctl sub use <name>` is called, it updates `.env` with `CLASH_URL`, `C
 | `libs/subconverter/linux-*/*` | Subconverter binaries by architecture |
 | `conf/fallback_config.yaml` | Fallback configuration template |
 
+### Commit Message Guidelines
+
+- No email addresses (e.g., `Co-Authored-By: email@example.com`)
+- No AI tool references (e.g., "Claude Code", "Generated with AI")
+
 ### Release Notes Guidelines
 
 - Do NOT include AI attribution identifiers such as "Generated with Claude Code" or similar markers in release notes, commit messages, or any project documentation.
